@@ -60,7 +60,8 @@ class DZDisplay: public Display
 {
 private: 
 	int tilesize;
-	list<JPEG_t*> level_imgs;
+	list<JPEG_t*> level_imgs1;
+	list<JPEG_t*> level_imgs2;
 	string datadir1, datadir2;
 	int buffersize;
 
@@ -72,11 +73,12 @@ public:
 	virtual int display(int left=0, int top=0, int mode=MODE_REFRESH);
 	virtual int display(int left, int top, double downsample, int mode=MODE_REFRESH); //0: refresh only, 1: fast, 2: normal, 3: high quality
 
+	void clearBuffer();
 	void setBufferSize(int _buffersize) {buffersize = _buffersize;}
 	JPEG_t* loadJPEG(const char* filename);
 	int writeJPEG (unsigned char* pixels, int w, int h, const char * filename, int quality = 90);
-	JPEG_t* findOrLoadNewTile(int level, int col, int row, string datadir);
-	int getImageRegion(unsigned char* buffer1, int level, Reg_t region_src, string datadir);
+	JPEG_t* findOrLoadNewTile(int level, int col, int row, int index=0);
+	int getImageRegion(unsigned char* buffer1, int level, Reg_t region_src, int index=0);
 };
 
 #endif

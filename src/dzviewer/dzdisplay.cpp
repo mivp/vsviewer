@@ -53,21 +53,37 @@ using namespace tinyxml2;
 DZDisplay::DZDisplay(int i, int w, int h): Display(i, w, h)
 {
 	buffersize = 16;
-	level_imgs.clear();
+	level_imgs1.clear();
+	level_imgs2.clear();
 }
 
 DZDisplay::~DZDisplay()
 {
-	for(list<JPEG_t*>::iterator it=level_imgs.begin(); it != level_imgs.end(); it++)
-	{
-		JPEG_t* jpeg = *it;
-		free(jpeg->pixels);
-	}
-	level_imgs.clear();
+	clearBuffer();
+}
+
+void DZDisplay::clearBuffer()
+{
+	for(list<JPEG_t*>::iterator it=level_imgs1.begin(); it != level_imgs1.end(); it++)
+        {
+                JPEG_t* jpeg = *it;
+                free(jpeg->pixels);
+        }
+        level_imgs1.clear();
+
+	for(list<JPEG_t*>::iterator it=level_imgs2.begin(); it != level_imgs2.end(); it++)
+        {
+                JPEG_t* jpeg = *it;
+                free(jpeg->pixels);
+        }
+        level_imgs2.clear();
 }
 
 int DZDisplay::loadVirtualSlide(Img_t img)
 {
+	// clear buffer
+	clearBuffer();
+
 	// parse dzi file
 	cout << "Parse dzi file: " << img.filename1 << endl;
 	XMLDocument doc;
@@ -116,6 +132,7 @@ int DZDisplay::loadVirtualSlide(Img_t img)
 		cout << "Invalid type" << endl;
 		return -1;
 	}
+	cout << "datadir1: " << datadir1 << " datadir2: " << datadir2 << endl;
 	
 	maxdownsample = 2.0 * level0_w / tilesize;
 
@@ -223,46 +240,62 @@ int DZDisplay::writeJPEG (unsigned char* pixels, int w, int h, const char * file
 	return 0;
 }
 
-JPEG_t* DZDisplay::findOrLoadNewTile(int level, int col, int row, string datadir)
+JPEG_t* DZDisplay::findOrLoadNewTile(int level, int col, int row, int index)
 {
-	for(list<JPEG_t*>::iterator it=level_imgs.begin(); it != level_imgs.end(); it++)
+	if(index == 0)
 	{
-		JPEG_t* jpeg = *it;
-		if(jpeg->level == level && jpeg->col == col && jpeg->row == row)
-			return jpeg;
+		for(list<JPEG_t*>::iterator it=level_imgs1.begin(); it != level_imgs1.end(); it++)
+		{
+			JPEG_t* jpeg = *it;
+			if(jpeg->level == level && jpeg->col == col && jpeg->row == row)
+				return jpeg;
+		}
+	}
+	else
+	{
+		for(list<JPEG_t*>::iterator it=level_imgs2.begin(); it != level_imgs2.end(); it++)
+                {
+                        JPEG_t* jpeg = *it;
+                        if(jpeg->level == level && jpeg->col == col && jpeg->row == row)
+                                return jpeg;
+                }
 	}
 	//load new
 	std::stringstream ss;
-	ss << datadir << level << "/" << col << "_" << row << ".jpeg";
+	if(index == 0)
+		ss << datadir1 << level << "/" << col << "_" << row << ".jpeg";
+	else
+		ss << datadir2 << level << "/" << col << "_" << row << ".jpeg";
 	string filename = ss.str();
-	/*
-	if(id == 2)
-	{
-		cout << endl;
-		cout << "(" << id << ") Level: " << level << " col: " << col << " row: " << row << endl;
-		cout << "(" << id << ") Load tile:" << filename << endl;
-	}
-	*/
 
 	JPEG_t* jpeg = loadJPEG(filename.c_str());
 	jpeg->level = level;
 	jpeg->col = col;
 	jpeg->row = row;
-	level_imgs.push_back(jpeg);
-	if(level_imgs.size() > buffersize)
-		level_imgs.pop_front();
+	if(index == 0)
+	{
+		level_imgs1.push_back(jpeg);
+		if(level_imgs1.size() > buffersize)
+			level_imgs1.pop_front();
+	}
+	else
+	{
+		level_imgs2.push_back(jpeg);
+                if(level_imgs2.size() > buffersize)
+                        level_imgs2.pop_front();
+	}
 
 	return jpeg;
 }
 
-int DZDisplay::getImageRegion(unsigned char* buffer, int level, Reg_t region_src, string datadir)
+int DZDisplay::getImageRegion(unsigned char* buffer, int level, Reg_t region_src, int index)
 {
 	int first_t_col, first_t_row, last_t_col, last_t_row;
 	first_t_col = region_src.left / tilesize;
 	first_t_row = region_src.top / tilesize;
 
-	last_t_col = (region_src.left + region_src.width) / tilesize;
-	last_t_row = (region_src.top + region_src.height) / tilesize;
+	last_t_col = (region_src.left + region_src.width -1) / tilesize;
+	last_t_row = (region_src.top + region_src.height -1) / tilesize;
 
 	//cout << "tile (hoz) from: " << first_t_col << " to: " << last_t_col << endl;
 	//cout << "tile (ver) from: " << first_t_row << " to: " << last_t_row << endl;
@@ -274,7 +307,7 @@ int DZDisplay::getImageRegion(unsigned char* buffer, int level, Reg_t region_src
 	{
 		for(int r = first_t_row; r <= last_t_row; r++)
 		{
-			JPEG_t* jpeg = findOrLoadNewTile(level, c, r, datadir);
+			JPEG_t* jpeg = findOrLoadNewTile(level, c, r, index);
 			//cout << "jpeg width: " << jpeg->width << " height: " << jpeg->height << endl;
 			
 			//copy data
@@ -298,14 +331,6 @@ int DZDisplay::getImageRegion(unsigned char* buffer, int level, Reg_t region_src
 			if(dest_first_col < 0)
 				dest_first_col = 0;
 
-			/*
-			if(id == 2)
-			{
-				cout << "(" << id << ") left: " << left << " right: " << right << " top: " << top << " bottom: " << bottom << endl;
-				cout << "(" << id << ") dest_first_row: " << dest_first_row << " dest_first_col: " << dest_first_col << endl;
-			}
-			*/
-			
 			for(int i=top; i<bottom; i++)
 			{
 				row_src_ptr = &jpeg->pixels[i*jpeg->width*3 + left*3];
@@ -355,8 +380,11 @@ int DZDisplay::display(int left, int top, double downsample, int mode)
 	region_dis.height = (img_h < height) ? img_h : height;
 	if(region_dis.height > top + img_h)
 		region_dis.height = top + img_h;
-	//cout << "(" << id << ") Display region: ";
-	//region_dis.print();
+	//if(id == 9)
+	//{
+	//	cout << "(" << id << ") Display region: ";
+	//	region_dis.print();
+	//}
 
 	//
 	maxlevel = 0;
@@ -384,8 +412,11 @@ int DZDisplay::display(int left, int top, double downsample, int mode)
 	region_src.top = (region_dis.top - top) * ratio;
 	region_src.width = region_dis.width*ratio;
 	region_src.height = region_dis.height*ratio;
-	//cout << "(" << id << ") Source region: ";
-	//region_src.print();
+	//if(id ==9)
+	//{
+	//	cout << "(" << id << ") Source region: ";
+	//	region_src.print();
+	//}
 
 	// load and display
 	read_time = 0; render_time = 0;
@@ -398,7 +429,7 @@ int DZDisplay::display(int left, int top, double downsample, int mode)
 		return -1;
 	}
 	unsigned int start_t = Utils::getTime();
-	getImageRegion(buffer1, level, region_src, datadir1);
+	getImageRegion(buffer1, level, region_src, 0);
 	read_time += Utils::getTime() - start_t;
 
 	if(stereo)
@@ -410,7 +441,7 @@ int DZDisplay::display(int left, int top, double downsample, int mode)
 			return -1;
 		}
 		unsigned int start_t = Utils::getTime();
-		getImageRegion(buffer2, level, region_src, datadir2);
+		getImageRegion(buffer2, level, region_src, 1);
 		read_time += Utils::getTime() - start_t;
 	}
 
