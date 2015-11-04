@@ -1,0 +1,13 @@
+#!/bin/sh
+
+usage() {
+	echo "Usage: ./GO_CAVE2_DZ [-b buffersize] [-i file] [-l file_l file_r]"
+}
+
+for var in "$@"
+do
+    args=`echo $args $var`
+done
+
+echo $args
+mpirun -np 21 --default-hostfile machines-monash dzviewer -s cave2 ${args}

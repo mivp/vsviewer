@@ -1,0 +1,3 @@
+#!/bin/sh
+
+./GO_DESKTOP_DZ -b 16 -i ./testdata/3755.dzi
