@@ -65,18 +65,18 @@ DZDisplay::~DZDisplay()
 void DZDisplay::clearBuffer()
 {
 	for(list<JPEG_t*>::iterator it=level_imgs1.begin(); it != level_imgs1.end(); it++)
-        {
-                JPEG_t* jpeg = *it;
-                free(jpeg->pixels);
-        }
-        level_imgs1.clear();
+    {
+        JPEG_t* jpeg = *it;
+        free(jpeg->pixels);
+    }
+    level_imgs1.clear();
 
 	for(list<JPEG_t*>::iterator it=level_imgs2.begin(); it != level_imgs2.end(); it++)
-        {
-                JPEG_t* jpeg = *it;
-                free(jpeg->pixels);
-        }
-        level_imgs2.clear();
+    {
+        JPEG_t* jpeg = *it;
+        free(jpeg->pixels);
+    }
+    level_imgs2.clear();
 }
 
 int DZDisplay::loadVirtualSlide(Img_t img)
@@ -134,7 +134,7 @@ int DZDisplay::loadVirtualSlide(Img_t img)
 	}
 	cout << "datadir1: " << datadir1 << " datadir2: " << datadir2 << endl;
 	
-	maxdownsample = 2.0 * level0_w / tilesize;
+	maxdownsample = 2.0 * level0_w / 1024;
 
 	// texture
 	if(tex1 == NULL)
@@ -254,11 +254,11 @@ JPEG_t* DZDisplay::findOrLoadNewTile(int level, int col, int row, int index)
 	else
 	{
 		for(list<JPEG_t*>::iterator it=level_imgs2.begin(); it != level_imgs2.end(); it++)
-                {
-                        JPEG_t* jpeg = *it;
-                        if(jpeg->level == level && jpeg->col == col && jpeg->row == row)
-                                return jpeg;
-                }
+        {
+            JPEG_t* jpeg = *it;
+            if(jpeg->level == level && jpeg->col == col && jpeg->row == row)
+                    return jpeg;
+        }
 	}
 	//load new
 	std::stringstream ss;
@@ -276,13 +276,21 @@ JPEG_t* DZDisplay::findOrLoadNewTile(int level, int col, int row, int index)
 	{
 		level_imgs1.push_back(jpeg);
 		if(level_imgs1.size() > buffersize)
+		{
+			JPEG_t* tmp = level_imgs1.front();
+			free(tmp->pixels);
 			level_imgs1.pop_front();
+		}
 	}
 	else
 	{
 		level_imgs2.push_back(jpeg);
-                if(level_imgs2.size() > buffersize)
-                        level_imgs2.pop_front();
+    	if(level_imgs2.size() > buffersize)
+    	{
+    		JPEG_t* tmp = level_imgs2.front();
+			free(tmp->pixels);
+        	level_imgs2.pop_front();
+    	}
 	}
 
 	return jpeg;

@@ -2,8 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <sstream>
-
-using namespace std;
+#include <math.h>
 
 char* Utils::getFileContent(string path)
 {
@@ -54,7 +53,7 @@ string Utils::getParametersString(Control_t control, int mode)
 void Utils::parseParametersString(const char* buff, int& mode, int64_t& l, int64_t& t, double& ds)
 {
     istringstream iss(buff);
-    string sub;
+    std::string sub;
     iss >> sub; 
     iss >> sub; mode = atoi(sub.c_str());
     iss >> sub; l = atoi(sub.c_str());
@@ -93,8 +92,8 @@ void Utils::zoom(int64_t w, int64_t h, int cwidth, int cheight, int numprocs, do
 
     double cur_w = 1.0 * w / control.downsample;
     double ratio = (prev_w-cur_w) / prev_w;
-    control.left = control.left + abs((numprocs-1)*cwidth/2-control.left)*ratio;
-    control.top = control.top + abs(cheight/2-control.top)*ratio;
+    control.left = control.left + abs(int64_t((numprocs-1)*cwidth/2-control.left))*ratio;
+    control.top = control.top + abs(int64_t(cheight/2-control.top))*ratio;
 }
 
 int Utils::resetParameters(int64_t w, int64_t h, int cwidth, int cheight, int numprocs, Control_t& control)
