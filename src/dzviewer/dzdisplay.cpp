@@ -407,13 +407,13 @@ int DZDisplay::display(int left, int top, double downsample, int mode)
 
 	double ratio = 1.0*level0_w / pow(2, (maxlevel-level)) / img_w;
 
-	if(level > 0 && downsample >= 1 && ratio > 1.0)
+	if(mode==MODE_FAST && level > 0 && downsample >= 1 && ratio > 1.0)
 	{
 		level--;
 		ratio = 1.0*level0_w / pow(2, (maxlevel-level)) / img_w;
 	}
 	if(id == 9)
-	cout << "(" << id << ") Level: " << level << endl;
+		cout << "(" << id << ") Level: " << level << endl;
 
 	Reg_t region_src;
 	region_src.left = (region_dis.left + index*width - left) * ratio;

@@ -419,14 +419,12 @@ int main( int argc, char* argv[] ){
 					}
 				}
 			}		
-
-			/*
-        	if(need_full_update)
+			if(need_full_update)
         	{
         		uint timediff = Utils::getTime() - t_start;
         		if(timediff > 500)
         		{
-        			msg = getParametersString(gcontrol, MODE_NORMAL);
+        			msg = Utils::getParametersString(gcontrol, MODE_NORMAL);
             		cout << "Send: " << msg << endl;
         			for(i=1;i<numprocs;i++)  
     					MPI_Send((char*)msg.c_str(), 256, MPI_CHAR, i, 0, MPI_COMM_WORLD);
@@ -435,7 +433,6 @@ int main( int argc, char* argv[] ){
     				need_full_update = false;
         		}
         	}
-        	*/
     	}
 	}  
 	else  // clients
