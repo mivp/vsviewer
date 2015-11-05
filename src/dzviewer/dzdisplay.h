@@ -37,33 +37,23 @@
 #define VSCLIENT_H__
 
 #include "display.h"
-
-extern "C" {
-#include "jpeglib.h" 
-}    
-#include <jerror.h>
+#include "pyramid.h"
 
 #include <iostream>
 #include <list>
 using namespace std;
 
-struct JPEG_t
-{
-	int level;
-	int col, row;
-	unsigned char* pixels;
-	unsigned int width, height;
-	unsigned int data_size;
-};
-
+// main class
 class DZDisplay: public Display
 {
 private: 
 	int tilesize;
+	int buffersize;
+
 	list<JPEG_t*> level_imgs1;
 	list<JPEG_t*> level_imgs2;
 	string datadir1, datadir2;
-	int buffersize;
+	Pyramid *pyramid1, *pyramid2;
 
 public:
 	DZDisplay(int ind, int w, int h);

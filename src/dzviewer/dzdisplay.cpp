@@ -50,16 +50,23 @@
 using namespace std;
 using namespace tinyxml2;
 
+// DZDisplay
 DZDisplay::DZDisplay(int i, int w, int h): Display(i, w, h)
 {
 	buffersize = 16;
 	level_imgs1.clear();
 	level_imgs2.clear();
+
+	pyramid1 = new Pyramid();
+	pyramid2 = new Pyramid();
 }
 
 DZDisplay::~DZDisplay()
 {
 	clearBuffer();
+
+	delete pyramid1;
+	delete pyramid2;
 }
 
 void DZDisplay::clearBuffer()
@@ -149,94 +156,11 @@ int DZDisplay::loadVirtualSlide(Img_t img)
 		tex2->init();
 	}
 
-	return 0;
-}
-
-JPEG_t* DZDisplay::loadJPEG(const char* filename)
-{
-	unsigned char* rowptr[1];    // pointer to an array
-	struct jpeg_decompress_struct info; //for our jpeg info
-	struct jpeg_error_mgr err;          //the error handler
-	int channels;
-
-	FILE* file = fopen(filename, "rb");  //open the file
-
-	info.err = jpeg_std_error(& err);     
-	jpeg_create_decompress(& info);   //fills info structure
-
-	//if the jpeg file doesn't load
-	if(!file) {
-		cout << "(" << id << ") Error reading JPEG file: " << filename << endl << stderr << endl; 
-	 	return NULL;
-	}
-
-	jpeg_stdio_src(&info, file);    
-	jpeg_read_header(&info, TRUE);   // read jpeg file header
-
-	jpeg_start_decompress(&info);    // decompress the file
-
-	JPEG_t* jpeg = new JPEG_t;
-	jpeg->width = info.output_width;
-	jpeg->height = info.output_height;
-	channels = info.num_components;
-	jpeg->data_size = jpeg->width * jpeg->height * 3;
+	// indexing
+	pyramid1->build(level0_w, level0_h, tilesize);
+	if(stereo)
+		pyramid2->build(level0_w, level0_h, tilesize);
 	
-	jpeg->pixels = (unsigned char *)malloc(jpeg->data_size);
-	//memset(jpeg->pixels, 0, jpeg->data_size);
-	while (info.output_scanline < info.output_height) // loop
-	{
-		// Enable jpeg_read_scanlines() to fill our jdata array
-		rowptr[0] = (unsigned char *)jpeg->pixels +  // secret to method
-		        3 * info.output_width * info.output_scanline; 
-		jpeg_read_scanlines(&info, rowptr, 1);
-	}
-
-	jpeg_finish_decompress(&info);   //finish decompressing
-
-	fclose(file);                    //close the file
-
-	return jpeg;
-}
-
-int DZDisplay::writeJPEG (unsigned char* pixels, int w, int h, const char * filename, int quality)
-{
-	struct jpeg_compress_struct cinfo;
-	struct jpeg_error_mgr jerr;
-
-	FILE * outfile;               
-	unsigned char* row_pointer[1];      
-	int row_stride = w*3;        
-
-	cinfo.err = jpeg_std_error(&jerr);
-	jpeg_create_compress(&cinfo);
-
-	if ((outfile = fopen(filename, "wb")) == NULL) {
-		cout << "Cannot open file " << filename << " to write" << endl;
-		cout << stderr << endl;
-		return -1;
-	}
-	jpeg_stdio_dest(&cinfo, outfile);
-
-	cinfo.image_width = w;
-	cinfo.image_height = h;
-	cinfo.input_components = 3;  
-	cinfo.in_color_space = JCS_RGB;       
-
-	jpeg_set_defaults(&cinfo);
-	jpeg_set_quality(&cinfo, quality, TRUE);
-
-	jpeg_start_compress(&cinfo, TRUE);
-
-	while (cinfo.next_scanline < cinfo.image_height) {
-		row_pointer[0] = pixels + cinfo.next_scanline * row_stride;
-		(void) jpeg_write_scanlines(&cinfo, row_pointer, 1);
-	}
-
-	jpeg_finish_compress(&cinfo);
-	fclose(outfile);
-
-	jpeg_destroy_compress(&cinfo);
-
 	return 0;
 }
 
@@ -244,22 +168,29 @@ JPEG_t* DZDisplay::findOrLoadNewTile(int level, int col, int row, int index)
 {
 	if(index == 0)
 	{
-		for(list<JPEG_t*>::iterator it=level_imgs1.begin(); it != level_imgs1.end(); it++)
+		if(pyramid1->getValue(level, col, row) == 1)
 		{
-			JPEG_t* jpeg = *it;
-			if(jpeg->level == level && jpeg->col == col && jpeg->row == row)
-				return jpeg;
+			for(list<JPEG_t*>::iterator it=level_imgs1.begin(); it != level_imgs1.end(); it++)
+			{
+				JPEG_t* jpeg = *it;
+				if(jpeg->level == level && jpeg->col == col && jpeg->row == row)
+					return jpeg;
+			}
 		}
 	}
 	else
 	{
-		for(list<JPEG_t*>::iterator it=level_imgs2.begin(); it != level_imgs2.end(); it++)
-        {
-            JPEG_t* jpeg = *it;
-            if(jpeg->level == level && jpeg->col == col && jpeg->row == row)
-                    return jpeg;
-        }
+		if(pyramid2->getValue(level, col, row) == 1)
+		{
+			for(list<JPEG_t*>::iterator it=level_imgs2.begin(); it != level_imgs2.end(); it++)
+	        {
+	            JPEG_t* jpeg = *it;
+	            if(jpeg->level == level && jpeg->col == col && jpeg->row == row)
+	                    return jpeg;
+	        }
+	    }
 	}
+
 	//load new
 	std::stringstream ss;
 	if(index == 0)
@@ -268,27 +199,33 @@ JPEG_t* DZDisplay::findOrLoadNewTile(int level, int col, int row, int index)
 		ss << datadir2 << level << "/" << col << "_" << row << ".jpeg";
 	string filename = ss.str();
 
-	JPEG_t* jpeg = loadJPEG(filename.c_str());
+	JPEG_t* jpeg = Utils::loadJPEG(filename.c_str());
+	if(!jpeg)
+		cout << "(" << id << ") Error reading JPEG file: " << filename << endl; 
 	jpeg->level = level;
 	jpeg->col = col;
 	jpeg->row = row;
 	if(index == 0)
 	{
 		level_imgs1.push_back(jpeg);
+		pyramid1->setValue(level, col, row, 1);
 		if(level_imgs1.size() > buffersize)
 		{
 			JPEG_t* tmp = level_imgs1.front();
 			free(tmp->pixels);
+			pyramid1->setValue(tmp->level, tmp->col, tmp->row, 0);
 			level_imgs1.pop_front();
 		}
 	}
 	else
 	{
 		level_imgs2.push_back(jpeg);
+		pyramid2->setValue(level, col, row, 1);
     	if(level_imgs2.size() > buffersize)
     	{
     		JPEG_t* tmp = level_imgs2.front();
 			free(tmp->pixels);
+			pyramid2->setValue(tmp->level, tmp->col, tmp->row, 0);
         	level_imgs2.pop_front();
     	}
 	}

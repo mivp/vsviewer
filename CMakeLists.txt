@@ -32,6 +32,10 @@ include(ExternalProject)
 include(${CMAKE_SOURCE_DIR}/external/UseOmicron.cmake)
 include_directories(${OMICRON_INCLUDE_DIRS})
 
+# libjpeg
+find_package(JPEG REQUIRED)
+include_directories(${JPEG_INCLUDE_DIR})
+
 # Set output paths
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
@@ -50,6 +54,7 @@ set(ALL_LIBS
 	GLEW_190
 	${MPI_LIBRARIES}
 	${OMICRON_LIB}
+	${JPEG_LIBRARIES}
 )
 
 # Compile apps

@@ -17,6 +17,11 @@
     #define GetCurrentDir getcwd
  #endif
 
+extern "C" {
+#include "jpeglib.h" 
+}    
+#include <jerror.h>
+
 using namespace std;
 
 /*!
@@ -33,6 +38,15 @@ struct Control_t
 		left = top = 0;
 		downsample = 1;
 	}
+};
+
+struct JPEG_t
+{
+    int level;
+    int col, row;
+    unsigned char* pixels;
+    unsigned int width, height;
+    unsigned int data_size;
 };
 
 class Utils
@@ -56,6 +70,10 @@ public:
     static void zoom(int64_t w, int64_t h, int cwidth, int cheight, int numprocs, double maxdownsample, double amount, Control_t& control);
 
     static int resetParameters(int64_t w, int64_t h, int cwidth, int cheight, int numprocs, Control_t& control);
+
+    static JPEG_t* loadJPEG(const char* filename);
+
+    static int writeJPEG (unsigned char* pixels, int w, int h, const char * filename, int quality);
 };
 
 #endif // UTILS_H

@@ -104,3 +104,89 @@ int Utils::resetParameters(int64_t w, int64_t h, int cwidth, int cheight, int nu
     control.left = ((numprocs-1)*cwidth - w/control.downsample) / 2;
     control.top = (cheight - h/control.downsample) / 2;
 }
+
+JPEG_t* Utils::loadJPEG(const char* filename)
+{
+    unsigned char* rowptr[1];    // pointer to an array
+    struct jpeg_decompress_struct info; //for our jpeg info
+    struct jpeg_error_mgr err;          //the error handler
+    int channels;
+
+    FILE* file = fopen(filename, "rb");  //open the file
+
+    info.err = jpeg_std_error(& err);     
+    jpeg_create_decompress(& info);   //fills info structure
+
+    //if the jpeg file doesn't load
+    if(!file)
+        return NULL;
+
+    jpeg_stdio_src(&info, file);    
+    jpeg_read_header(&info, TRUE);   // read jpeg file header
+
+    jpeg_start_decompress(&info);    // decompress the file
+
+    JPEG_t* jpeg = new JPEG_t;
+    jpeg->width = info.output_width;
+    jpeg->height = info.output_height;
+    channels = info.num_components;
+    jpeg->data_size = jpeg->width * jpeg->height * 3;
+    
+    jpeg->pixels = (unsigned char *)malloc(jpeg->data_size);
+    //memset(jpeg->pixels, 0, jpeg->data_size);
+    while (info.output_scanline < info.output_height) // loop
+    {
+        // Enable jpeg_read_scanlines() to fill our jdata array
+        rowptr[0] = (unsigned char *)jpeg->pixels +  // secret to method
+                3 * info.output_width * info.output_scanline; 
+        jpeg_read_scanlines(&info, rowptr, 1);
+    }
+
+    jpeg_finish_decompress(&info);   //finish decompressing
+
+    fclose(file);                    //close the file
+
+    return jpeg;
+}
+
+int Utils::writeJPEG (unsigned char* pixels, int w, int h, const char * filename, int quality)
+{
+    struct jpeg_compress_struct cinfo;
+    struct jpeg_error_mgr jerr;
+
+    FILE * outfile;               
+    unsigned char* row_pointer[1];      
+    int row_stride = w*3;        
+
+    cinfo.err = jpeg_std_error(&jerr);
+    jpeg_create_compress(&cinfo);
+
+    if ((outfile = fopen(filename, "wb")) == NULL) {
+        cout << "Cannot open file " << filename << " to write" << endl;
+        cout << stderr << endl;
+        return -1;
+    }
+    jpeg_stdio_dest(&cinfo, outfile);
+
+    cinfo.image_width = w;
+    cinfo.image_height = h;
+    cinfo.input_components = 3;  
+    cinfo.in_color_space = JCS_RGB;       
+
+    jpeg_set_defaults(&cinfo);
+    jpeg_set_quality(&cinfo, quality, TRUE);
+
+    jpeg_start_compress(&cinfo, TRUE);
+
+    while (cinfo.next_scanline < cinfo.image_height) {
+        row_pointer[0] = pixels + cinfo.next_scanline * row_stride;
+        (void) jpeg_write_scanlines(&cinfo, row_pointer, 1);
+    }
+
+    jpeg_finish_compress(&cinfo);
+    fclose(outfile);
+
+    jpeg_destroy_compress(&cinfo);
+
+    return 0;
+}
