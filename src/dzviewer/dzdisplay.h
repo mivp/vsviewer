@@ -39,6 +39,8 @@
 #include "display.h"
 #include "pyramid.h"
 
+#include <omicron/Thread.h>
+
 #include <iostream>
 #include <list>
 using namespace std;
@@ -53,7 +55,10 @@ private:
 	list<JPEG_t*> level_imgs1;
 	list<JPEG_t*> level_imgs2;
 	string datadir1, datadir2;
-	Pyramid *pyramid1, *pyramid2;
+	Pyramid* pyramids[2];
+
+	static list<omicron::Thread*> sImageLoaderThread;
+	static int sNumLoaderThreads;
 
 public:
 	DZDisplay(int ind, int w, int h);
@@ -63,11 +68,11 @@ public:
 	virtual int display(int left=0, int top=0, int mode=MODE_REFRESH);
 	virtual int display(int left, int top, double downsample, int mode=MODE_REFRESH); //0: refresh only, 1: fast, 2: normal, 3: high quality
 
+	void setNumThreads(int _thread) {sNumLoaderThreads = _thread;}
 	void clearBuffer();
 	void setBufferSize(int _buffersize) {buffersize = _buffersize;}
 	JPEG_t* loadJPEG(const char* filename);
 	int writeJPEG (unsigned char* pixels, int w, int h, const char * filename, int quality = 90);
-	JPEG_t* findOrLoadNewTile(int level, int col, int row, int index=0);
 	int getImageRegion(unsigned char* buffer1, int level, Reg_t region_src, int index=0);
 };
 

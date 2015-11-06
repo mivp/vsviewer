@@ -60,6 +60,7 @@ Control_t gcontrol;
 int cwidth, cheight;
 double maxdownsample;
 int buffersize = 16;
+int numthreads = 2;
 
 double zoom_amount = 0.1;
 double pan_amount = 0.01;
@@ -73,11 +74,12 @@ ServiceManager* sm;
 void usage()
 {
 	cout << endl;
-	cout << "Usage: ./vsviewer [-h] [-s system] [-n] [-b buffersize] [-i img1] [-l img2l img2r]" << endl;
+	cout << "Usage: ./vsviewer [-h] [-s system] [-n] [-b buffersize] [-t numthreads] [-i img1] [-l img2l img2r]" << endl;
 	cout << "  -s: system {desktop, cave2}. Default: desktop" << endl;
 	cout << "  -n: dont use Omicron (wand controller)" << endl;
 	cout << "  -h: print this help" << endl;
-	cout << "  -b: bufer size. Default: 16" << endl;
+	cout << "  -b: bufer size. Default = 16" << endl;
+	cout << "  -t: number of reading threads. Default = 2" << endl;
 	cout << "  -i: single file" << endl;
 	cout << "  -l: stereo, left first" << endl;
 	cout << "  -r: stereo, right first" << endl;
@@ -131,6 +133,11 @@ int initParameters(int argc, char* argv[], int myid)
 		else if (strcmp(argv[i], "-b")==0)
 		{
 			buffersize = atoi(argv[++i]);
+			i++;
+		}
+		else if(strcmp(argv[i], "-t") ==0)
+		{
+			numthreads = atoi(argv[++i]);
 			i++;
 		}
 		else if (strcmp(argv[i],"-i")==0)
@@ -439,6 +446,7 @@ int main( int argc, char* argv[] ){
 	{  
 		DZDisplay* display = new DZDisplay(myid, cwidth, cheight);
 		display->setBufferSize(buffersize);
+		display->setNumThreads(numthreads);
 		display->initDisplay();
 	  	if(display->loadVirtualSlide(filenames[0]) == -1)
 	  		return -1;

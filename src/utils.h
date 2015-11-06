@@ -47,6 +47,16 @@ struct JPEG_t
     unsigned char* pixels;
     unsigned int width, height;
     unsigned int data_size;
+
+    //for async loading
+    bool ready;
+    string path;
+    int leftright; //0: left, 1: right
+    JPEG_t()
+    {
+        leftright = 0;
+        ready = false; pixels = NULL;
+    }
 };
 
 class Utils
@@ -72,6 +82,8 @@ public:
     static int resetParameters(int64_t w, int64_t h, int cwidth, int cheight, int numprocs, Control_t& control);
 
     static JPEG_t* loadJPEG(const char* filename);
+
+    static unsigned char* loadJPEG(const char* filename, unsigned int &width, unsigned int &height);
 
     static int writeJPEG (unsigned char* pixels, int w, int h, const char * filename, int quality);
 };

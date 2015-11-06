@@ -1,3 +1,3 @@
 #!/bin/sh
 
-./GO_CAVE2_DZ -b 256 -i /data/fast/toand/mydz/3755_2048.dzi -l /data/fast/toand/mydz/snow3_l.dzi /data/fast/toand/mydz/snow3_r.dzi -i /data/fast/toand/mydz/marble.dzi
+./GO_CAVE2_DZ -b 256 -t 4 -i /data/fast/toand/mydz/3755.dzi -l /data/fast/toand/mydz/snow3_l.dzi /data/fast/toand/mydz/snow3_r.dzi -i /data/fast/toand/mydz/marble.dzi

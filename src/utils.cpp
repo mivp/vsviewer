@@ -105,7 +105,7 @@ int Utils::resetParameters(int64_t w, int64_t h, int cwidth, int cheight, int nu
     control.top = (cheight - h/control.downsample) / 2;
 }
 
-JPEG_t* Utils::loadJPEG(const char* filename)
+unsigned char* Utils::loadJPEG(const char* filename, unsigned int &width, unsigned int &height)
 {
     unsigned char* rowptr[1];    // pointer to an array
     struct jpeg_decompress_struct info; //for our jpeg info
@@ -126,18 +126,16 @@ JPEG_t* Utils::loadJPEG(const char* filename)
 
     jpeg_start_decompress(&info);    // decompress the file
 
-    JPEG_t* jpeg = new JPEG_t;
-    jpeg->width = info.output_width;
-    jpeg->height = info.output_height;
+    width = info.output_width;
+    height = info.output_height;
     channels = info.num_components;
-    jpeg->data_size = jpeg->width * jpeg->height * 3;
+    int data_size = width * height * 3;
     
-    jpeg->pixels = (unsigned char *)malloc(jpeg->data_size);
-    //memset(jpeg->pixels, 0, jpeg->data_size);
+    unsigned char* pixels = (unsigned char *)malloc(data_size);
     while (info.output_scanline < info.output_height) // loop
     {
         // Enable jpeg_read_scanlines() to fill our jdata array
-        rowptr[0] = (unsigned char *)jpeg->pixels +  // secret to method
+        rowptr[0] = (unsigned char *)pixels +  // secret to method
                 3 * info.output_width * info.output_scanline; 
         jpeg_read_scanlines(&info, rowptr, 1);
     }
@@ -146,6 +144,17 @@ JPEG_t* Utils::loadJPEG(const char* filename)
 
     fclose(file);                    //close the file
 
+    return pixels;
+}
+
+JPEG_t* Utils::loadJPEG(const char* filename)
+{
+    JPEG_t* jpeg = new JPEG_t;
+    unsigned char* pixels;
+    pixels = loadJPEG(filename, jpeg->width, jpeg->height);
+    if(!pixels)
+        return NULL;
+    jpeg->data_size = jpeg->width*jpeg->height*3;
     return jpeg;
 }
 
