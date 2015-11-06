@@ -1,7 +1,8 @@
 #Virtual slide viewer for CAVE2#
 
 ##Log##
-* v1.0.01: DeepZoom input
+* v1.1.0: async image reading
+* v1.0.0: DeepZoom input
 
 ##Required packages##
 * openmpi (http://www.open-mpi.org/)
@@ -15,8 +16,9 @@ Tested on MacOS 10.10 and OpenSuSE 12.3
 * run: make
 
 ##How to run dzviewer##
-* run: GO_DESKTOP_DZ [-i dzi_file] [-l dzi_file_l dzi_file_r]
-* run: GO_CAVE2_DZ [-i dzi_file] [-l dzi_file_l dzi_file_r]
+* run: GO_DESKTOP_DZ [-b buffersize] [-t numthreads] [-i dzi_file] [-l dzi_file_l dzi_file_r]
+* run: GO_CAVE2_DZ [-b buffersize] [-t numthreads] [-i dzi_file] [-l dzi_file_l dzi_file_r]
+* default values: buffersize = 16, numthreads = 2
 * check GO_DESKTOP_DZ_DEMO and GO_CAVE2_DZ_DEMO for examples
 
 ##Usage##
