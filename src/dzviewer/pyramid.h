@@ -1,6 +1,7 @@
 #ifndef _PYRAMID_H__
 #define _PYRAMID_H__
 
+#include <sys/types.h>
 #include <vector>
 using std::vector;
 

@@ -95,7 +95,7 @@ public:
                 }
 
           	}
-            osleep(100);
+            osleep(50);
         }
         cout << "ImageLoaderThread: shutdown" << endl;
     }
@@ -113,6 +113,16 @@ DZDisplay::DZDisplay(int i, int w, int h): Display(i, w, h)
 
 	if(i == 0)
 		sNumLoaderThreads = 1;
+
+	if(sImageLoaderThread.size() == 0)
+    {
+    	for(int i = 0; i < sNumLoaderThreads; i++)
+	    {
+	        Thread* t = new ImageLoaderThread();
+	     	t->start();
+	        sImageLoaderThread.push_back(t);;
+	    }
+    }
 }
 
 DZDisplay::~DZDisplay()
@@ -125,6 +135,10 @@ DZDisplay::~DZDisplay()
 
 void DZDisplay::clearBuffer()
 {
+	sImageQueueLock.lock();
+	sImageQueue.clear();
+    sImageQueueLock.unlock();
+
 	for(list<JPEG_t*>::iterator it=level_imgs1.begin(); it != level_imgs1.end(); it++)
     {
         JPEG_t* jpeg = *it;
@@ -144,15 +158,6 @@ int DZDisplay::loadVirtualSlide(Img_t img)
 {
 	// clear buffer
 	clearBuffer();
-
-	// asysn tasks
-	for(list<Thread*>::iterator it = sImageLoaderThread.begin(); it != sImageLoaderThread.end(); it++)
-	{
-		Thread *t = *it;
-		t->stop();
-	}
-	sImageLoaderThread.clear();
-	sImageQueue.clear();
 
 	// parse dzi file
 	cout << "Parse dzi file: " << img.filename1 << endl;
@@ -224,13 +229,7 @@ int DZDisplay::loadVirtualSlide(Img_t img)
 	if(stereo)
 		pyramids[1]->build(level0_w, level0_h, tilesize);
 
-	// start image reading thread
-	for(int i = 0; i < sNumLoaderThreads; i++)
-    {
-        Thread* t = new ImageLoaderThread();
-        t->start();
-        sImageLoaderThread.push_back(t);;
-    }
+	cout << "(" << id << ") loadVirtualSlide completed!" << endl;
 	
 	return 0;
 }
