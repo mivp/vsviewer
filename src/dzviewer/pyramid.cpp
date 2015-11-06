@@ -33,7 +33,7 @@ int Level::setValue(int col, int row, bool value)
 	return 0;
 }
 
-int Level::getValue(int row, int col)
+int Level::getValue(int col, int row)
 {
 	int index = row * ncols + col;
 	if(index >= nrows*ncols)

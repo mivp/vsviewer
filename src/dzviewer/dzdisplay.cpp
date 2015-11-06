@@ -95,7 +95,7 @@ public:
                 }
 
           	}
-            osleep(50);
+            osleep(1);
         }
         cout << "ImageLoaderThread: shutdown" << endl;
     }
@@ -226,6 +226,8 @@ int DZDisplay::loadVirtualSlide(Img_t img)
 
 	// indexing
 	pyramids[0]->build(level0_w, level0_h, tilesize);
+	if(id == 18)
+		pyramids[0]->print();
 	if(stereo)
 		pyramids[1]->build(level0_w, level0_h, tilesize);
 
@@ -251,6 +253,9 @@ int DZDisplay::getImageRegion(unsigned char* buffer, int level, Reg_t region_src
 	{
 		for(int r = first_t_row; r <= last_t_row; r++)
 		{
+			int ret = pyramids[index]->getValue(level, c, r);
+			if(ret == -1)
+				cout << "Pyramid problem!!! level:" << level << " c: " << c << " r: " << r << endl;
 			if(pyramids[index]->getValue(level, c, r) == 0)
 			{
 				JPEG_t* jpeg = new JPEG_t;
@@ -332,7 +337,7 @@ int DZDisplay::getImageRegion(unsigned char* buffer, int level, Reg_t region_src
 
 			while(!jpeg->ready)
 			{
-				osleep(1);
+				//osleep(1);
 			}
 			
 			//copy data
