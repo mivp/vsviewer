@@ -33,8 +33,7 @@
 **
 **~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
-#include "vsdisplay.h"
-#include <openslide-features.h>
+#include "osdisplay.h"
 
 #include "utils.h"
 #include "glutils.h"
@@ -43,84 +42,177 @@
 #include <iostream>
 #include <sstream>
 #include <cassert>
+#include <math.h>
+#include <stdio.h>
+#include <memory.h>
 
 using namespace std;
+using namespace omicron;
 
-VSDisplay::VSDisplay(int i, int w, int h): id(i), width(w), height(h), stereo(false), leftfirst(true),
-											osr1(NULL), osr2(NULL), tex1(NULL), tex2(NULL)
+//global
+openslide_t *osrs[2];
+int tilesize;
+
+Lock sImageQueueLock;
+bool sShutdownLoaderThread = false;
+int OSDisplay::sNumLoaderThreads = 2;
+list<Thread*> OSDisplay::sImageLoaderThread;
+list<JPEG_t*> sImageQueue;
+
+class ImageLoaderThread: public Thread
 {
-	index = id - 1;
-	if (index < 0)
-		index = 0;
-	fastlevel = 4;
+public:
+    ImageLoaderThread()
+    {}
+
+    virtual void threadProc()
+    {
+        cout << "ImageLoaderThread: start" << endl;
+
+        while(!sShutdownLoaderThread)
+        {
+          	if(sImageQueue.size() > 0)
+          	{
+          		sImageQueueLock.lock();
+          		if(sImageQueue.size() > 0)
+                {
+                	JPEG_t* jpeg = sImageQueue.front();
+                    sImageQueue.pop_front();
+                    sImageQueueLock.unlock();
+
+                    jpeg->pixels = Utils::loadTile(osrs[jpeg->leftright], jpeg->level, 
+                    								jpeg->row, jpeg->col, tilesize,	jpeg->width, jpeg->height);
+                    jpeg->data_size = jpeg->width*jpeg->height*sizeof(uint32_t);
+
+                    if(!sShutdownLoaderThread)
+                    {
+                    	jpeg->ready = true;
+                        //cout << "  Image is ready to use!!!" << endl;
+                    }
+                }
+                else
+                {
+                	sImageQueueLock.unlock();
+                }
+
+          	}
+            osleep(1);
+        }
+        cout << "ImageLoaderThread: shutdown" << endl;
+    }
+};
+
+// OSDisplay
+OSDisplay::OSDisplay(int i, int w, int h): Display(i, w, h)
+{
+	buffersize = 16;
+	level_imgs1.clear();
+	level_imgs2.clear();
+
+	osrs[0] = NULL;
+	osrs[1] = NULL;
+
+	pyramids[0] = new Pyramid();
+	pyramids[1] = new Pyramid();
+
+	tilesize = 1024;
+
+	if(i == 0)
+		sNumLoaderThreads = 1;
+
+	if(sImageLoaderThread.size() == 0)
+    {
+    	for(int i = 0; i < sNumLoaderThreads; i++)
+	    {
+	        Thread* t = new ImageLoaderThread();
+	     	t->start();
+	        sImageLoaderThread.push_back(t);;
+	    }
+    }
 }
 
-VSDisplay::~VSDisplay()
+OSDisplay::~OSDisplay()
 {
-	if(osr1)
-		openslide_close(osr1);
-	if(osr2)
-		openslide_close(osr2);
+	clearBuffer();
+
+	if(osrs[0])
+		openslide_close(osrs[0]);
+	if(osrs[1])
+		openslide_close(osrs[1]);
+
+	delete pyramids[0];
+	delete pyramids[1];
 }
 
-int VSDisplay::loadVirtualSlide(Img_t img)
+void OSDisplay::clearBuffer()
 {
-	if(osr1)
+	sImageQueueLock.lock();
+	sImageQueue.clear();
+    sImageQueueLock.unlock();
+
+	for(list<JPEG_t*>::iterator it=level_imgs1.begin(); it != level_imgs1.end(); it++)
+    {
+        JPEG_t* jpeg = *it;
+        free(jpeg->pixels);
+    }
+    level_imgs1.clear();
+
+	for(list<JPEG_t*>::iterator it=level_imgs2.begin(); it != level_imgs2.end(); it++)
+    {
+        JPEG_t* jpeg = *it;
+        free(jpeg->pixels);
+    }
+    level_imgs2.clear();
+}
+
+int OSDisplay::loadVirtualSlide(Img_t img)
+{
+	// clear buffer
+	clearBuffer();
+
+	for(int i=0; i<2; i++)
 	{
-		openslide_close(osr1);
-		osr1 = NULL;
-	}
-	if(osr2)
-	{
-		openslide_close(osr2);
-		osr2 = NULL;
+		if(osrs[i])
+		{
+			openslide_close(osrs[i]);
+			osrs[i] = NULL;
+		}
 	}
 
 	stereo = false;
 	if(img.type == 0)
 	{
 		cout << "(" << id << "): Open file: " << img.filename1 << endl;
-		osr1 = openslide_open(img.filename1.c_str());
-		assert(osr1);
+		osrs[0] = openslide_open(img.filename1.c_str());
+		assert(osrs[0]);
 	}
 	else if (img.type == 1)
 	{
 		cout << "(" << id << "): Open files: " << img.filename1 << " " << img.filename2 << endl;
-		osr1 = openslide_open(img.filename1.c_str());
-		osr2 = openslide_open(img.filename2.c_str());
-		assert(osr1);
-		assert(osr2);
+		osrs[0] = openslide_open(img.filename1.c_str());
+		osrs[1] = openslide_open(img.filename2.c_str());
+		assert(osrs[0]);
+		assert(osrs[1]);
 		stereo = true;
 	}
 	else if (img.type == 2)
 	{
 		cout << "(" << id << "): Open files: " << img.filename2 << " " << img.filename1 << endl;
-		osr1 = openslide_open(img.filename2.c_str());
-		osr2 = openslide_open(img.filename1.c_str());
-		assert(osr1);
-		assert(osr2);
+		osrs[0] = openslide_open(img.filename2.c_str());
+		osrs[1] = openslide_open(img.filename1.c_str());
+		assert(osrs[0]);
+		assert(osrs[1]);
 		stereo = true;
 	}
-
+	
 	//cout << "(" << id << ") Version: " << openslide_get_version() << endl;
-	cout << "(" << id << ") Num level: " << openslide_get_level_count(osr1) << endl;
-	openslide_get_level_dimensions(osr1, 0, &level0_w, &level0_h);
+	cout << "(" << id << ") Num level: " << openslide_get_level_count(osrs[0]) << endl;
+	openslide_get_level_dimensions(osrs[0], 0, &level0_w, &level0_h);
 	cout << "(" << id << ") Level 0 dimensions: " << level0_w << " " << level0_h << endl;
 
-	maxlevel = openslide_get_level_count(osr1);
+	maxlevel = openslide_get_level_count(osrs[0]);
 
-	int64_t w_l, h_l;
-	for(int i=0; i < maxlevel; i++)
-	{	
-		openslide_get_level_dimensions(osr1, i, &w_l, &h_l);
-		maxdownsample = openslide_get_level_downsample(osr1, i);
-		if(h_l < height)
-			break;
-	}
-
-	fastlevel = 4;
-	if(fastlevel >= maxlevel)
-		fastlevel = maxlevel - 1;
+	maxdownsample = 2.0 * level0_w / 1024;
 
 	// texture
 	if(tex1 == NULL)
@@ -135,114 +227,177 @@ int VSDisplay::loadVirtualSlide(Img_t img)
 		tex2->init();
 	}
 
-	return 0;
-}
+	// indexing
+	pyramids[0]->build(osrs[0], tilesize);
+	if(id == 1)
+		pyramids[0]->print();
+	if(stereo)
+		pyramids[1]->build(osrs[0], tilesize);
 
-int VSDisplay::initDisplay()
-{
-	// Initialise GLFW
-    if( !glfwInit() )
-    {
-        fprintf( stderr, "Failed to initialize GLFW\n" );
-        return -1;
-    }
-
-    // OpenGL 2.1
-    glfwWindowHint(GLFW_SAMPLES, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
-    glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
-
-    // Open a window and create its OpenGL context
-    std::ostringstream ss;
-	ss << "Virtual Slide Viewer (" << id << ")";
-    window = glfwCreateWindow( width, height, ss.str().c_str(), NULL, NULL);
-    if( window == NULL ){
-        cout << "Failed to open GLFW window: " << stderr << endl;
-        glfwTerminate();
-        return -1;
-    }
-    glfwMakeContextCurrent(window);
-    //glfwSetKeyCallback(window, key_callback);
-    //glfwSetWindowSizeCallback(window, window_size_callback);
-
-    // Initialize GLEW
-    glewExperimental = GL_TRUE;
-    if (glewInit() != GLEW_OK) {
-        cout << "Failed to initialize GLEW: " << stderr << endl;
-        return -1;
-    }
-    
-    // Ensure we can capture the escape key being pressed below
-    //glfwSetInputMode(window, GLFW_STICKY_KEYS, GL_TRUE);
-
-    // print GL info
-    //GLUtils::dumpGLInfo(true);
-
-	// shaders
-	list<string> attributes, uniforms;
-	attributes.clear(); uniforms.clear();
-    attributes.push_back("position");
-    attributes.push_back("texcoor");
-    uniforms.push_back("tranMat");
-    uniforms.push_back("texScene");
-    ShaderLibrary::addShader("ss_display", "shaders/ss_display", attributes, uniforms);
-    shaderDisplay = ShaderLibrary::getShader("ss_display");
-
-    attributes.clear(); uniforms.clear();
-    attributes.push_back("position");
-    attributes.push_back("texcoor");
-    uniforms.push_back("tranMat");
-    uniforms.push_back("leftFirst");
-    uniforms.push_back("texScene1");
-    uniforms.push_back("texScene2");
-    ShaderLibrary::addShader("ss_display3d", "shaders/ss_display3d", attributes, uniforms);
-    shaderDisplay3d = ShaderLibrary::getShader("ss_display3d");
-
-    // quad
-    quad = new SSQuad();
-    quad->init();
+	cout << "(" << id << ") loadVirtualSlide completed!" << endl;
 	
 	return 0;
 }
 
-int VSDisplay::display(int left, int top, int mode)
+int OSDisplay::getImageRegion(unsigned char* buffer, int level, Reg_t region_src, int index)
+{
+	int first_t_col, first_t_row, last_t_col, last_t_row;
+	first_t_col = region_src.left / tilesize;
+	first_t_row = region_src.top / tilesize;
+
+	last_t_col = (region_src.left + region_src.width -1) / tilesize;
+	last_t_row = (region_src.top + region_src.height -1) / tilesize;
+
+	//cout << "tile (hoz) from: " << first_t_col << " to: " << last_t_col << endl;
+	//cout << "tile (ver) from: " << first_t_row << " to: " << last_t_row << endl;
+
+	//add to queue
+	for(int c = first_t_col; c <= last_t_col; c++)
+	{
+		for(int r = first_t_row; r <= last_t_row; r++)
+		{
+			//int ret = pyramids[index]->getValue(level, c, r);
+			//if(ret == -1)
+			//	cout << "Pyramid problem!!! level:" << level << " c: " << c << " r: " << r << endl;
+			if(pyramids[index]->getValue(level, c, r) == 0)
+			{
+				JPEG_t* jpeg = new JPEG_t;
+				jpeg->level = level; jpeg->col = c; jpeg->row = r;
+				jpeg->ready = false;
+				jpeg->leftright = index;
+				std::stringstream ss;
+				if(index == 0)
+				{
+					level_imgs1.push_back(jpeg);
+					if(level_imgs1.size() > buffersize)
+					{
+						JPEG_t* tmp = level_imgs1.front();
+						free(tmp->pixels);
+						sImageQueueLock.lock();
+						pyramids[index]->setValue(tmp->level, tmp->col, tmp->row, 0);
+						sImageQueueLock.unlock();
+						level_imgs1.pop_front();
+					}
+				}
+				else
+				{
+					level_imgs2.push_back(jpeg);
+					if(level_imgs2.size() > buffersize)
+					{
+						JPEG_t* tmp = level_imgs2.front();
+						free(tmp->pixels);
+						sImageQueueLock.lock();
+						pyramids[index]->setValue(tmp->level, tmp->col, tmp->row, 0);
+						sImageQueueLock.unlock();
+						level_imgs2.pop_front();
+					}
+				}
+				pyramids[index]->setValue(level, c, r, 1);
+				sImageQueueLock.lock();
+				sImageQueue.push_back(jpeg);
+				sImageQueueLock.unlock();
+			}
+		}
+	}
+
+	unsigned char* row_src_ptr;
+	unsigned char* row_des_ptr;
+
+	for(int c = first_t_col; c <= last_t_col; c++)
+	{
+		for(int r = first_t_row; r <= last_t_row; r++)
+		{
+			JPEG_t* jpeg = NULL;
+			if(index == 0)
+			{
+				for(list<JPEG_t*>::iterator it=level_imgs1.begin(); it != level_imgs1.end(); it++)
+				{
+					jpeg = *it;
+					if(jpeg->level == level && jpeg->col == c && jpeg->row == r)
+						break;
+				}
+			}
+			else
+			{
+				for(list<JPEG_t*>::iterator it=level_imgs2.begin(); it != level_imgs2.end(); it++)
+				{
+					jpeg = *it;
+					if(jpeg->level == level && jpeg->col == c && jpeg->row == r)
+						break;
+				}
+			}
+			if(!jpeg)
+			{
+				cout << "(" << id << ") Cannot find image" << endl;
+				return -1;
+			}
+
+			while(!jpeg->ready)
+			{
+				//osleep(1);
+			}
+			
+			//copy data
+			int left = region_src.left - c*tilesize;
+			if(left < 0)
+				left = 0;
+			int top = region_src.top - r*tilesize;
+			if(top < 0)
+				top = 0;
+			int right = region_src.left + region_src.width - c*tilesize;
+			if(right > tilesize)
+				right = tilesize;
+			int bottom = region_src.top + region_src.height - r*tilesize;
+			if(bottom > tilesize)
+				bottom = tilesize;
+
+			int dest_first_row = r*tilesize - region_src.top;
+			if(dest_first_row < 0)
+				dest_first_row = 0;
+			int dest_first_col = c*tilesize - region_src.left;
+			if(dest_first_col < 0)
+				dest_first_col = 0;
+			for(int i=top; i<bottom; i++)
+			{
+				row_src_ptr = &jpeg->pixels[i*jpeg->width*sizeof(uint32_t) + left*sizeof(uint32_t)];
+				row_des_ptr = &buffer[dest_first_row*region_src.width*sizeof(uint32_t) + dest_first_col*sizeof(uint32_t)];
+				memcpy(row_des_ptr, (unsigned char*)row_src_ptr, (right-left)*sizeof(uint32_t));
+				dest_first_row++;
+			}
+		}
+	}
+	
+	return 0;
+}
+
+int OSDisplay::display(int left, int top, int mode)
 {
 	double downsample = 1.0*level0_w / width;
 	return display(left, top, downsample, mode);
 }
 
-int VSDisplay::display(int left, int top, double downsample, int mode)
+int OSDisplay::display(int left, int top, double downsample, int mode)
 {
-	if(mode == MODE_REFRESH) // refresh
-	{
-		draw();
-		return 0;
-	}
-
-	int level = openslide_get_best_level_for_downsample(osr1, downsample);
-	//cout << "(" << id << ") Best level: " << level << endl;
-	if(mode == MODE_FAST)
-	{
-		if(level < fastlevel)
-			level = fastlevel;
-		if(level > maxlevel)
-			level = maxlevel;
-	}
-	else if (mode == MODE_NORMAL)
-	{
-		if(level < fastlevel && downsample >= 1.0)
-			level++;
-	}
+	int level = openslide_get_best_level_for_downsample(osrs[0], downsample);
 
 	int64_t level_w, level_h;
-	openslide_get_level_dimensions(osr1, level, &level_w, &level_h);
+	openslide_get_level_dimensions(osrs[0], level, &level_w, &level_h);
 	//cout << "(" << id << ") Level dims: " << level_w << " " << level_h << endl;
 
 	int64_t img_w, img_h;
 	img_w = int64_t(level0_w / downsample);
 	img_h = int64_t(level0_h / downsample);
 	//cout << "(" << id << ") Image dims: " << img_w << " " << img_h << endl;
+
+	double ratio = 1.0*level_w/img_w;
+	if(mode==MODE_FAST && level < maxlevel && downsample >= 1 && ratio > 1.0)
+	{
+		level++;
+		openslide_get_level_dimensions(osrs[0], level, &level_w, &level_h);
+		ratio = 1.0*level_w/img_w;
+	}
+	//if(id == 9)
+		cout << "(" << id << ") Level: " << level << endl;
 
 	int64_t c_left = width*index;
 	int64_t c_top = 0;
@@ -261,104 +416,74 @@ int VSDisplay::display(int left, int top, double downsample, int mode)
 	region_dis.left -= index*width;
 	region_dis.top = (top > c_top) ? top : c_top;
 	region_dis.width = width - region_dis.left;
+	if(region_dis.width > left + img_w - c_left)
+		region_dis.width = left + img_w - c_left;
 	region_dis.height = (img_h < height) ? img_h : height;
-	//cout << "(" << id << ") Display region: ";
-	//region_dis.print();
+	if(region_dis.height > top + img_h)
+		region_dis.height = top + img_h;
+	//if(id == 9)
+	//{
+		cout << "(" << id << ") Display region: ";
+		region_dis.print();
+	//}
 
-	double ratio = 1.0*level_w/img_w;
-	//cout << "(" << id << ") Ratio (level/img): " << ratio << endl;
 	Reg_t region_src;
-	region_src.left = (region_dis.left + index*width - left) * downsample;
-	region_src.top = (region_dis.top - top) * downsample;
+	region_src.left = (region_dis.left + index*width - left) * ratio;
+	region_src.top = (region_dis.top - top) * ratio;
 	region_src.width = region_dis.width*ratio;
 	region_src.height = region_dis.height*ratio;
-	//cout << "(" << id << ") Source region: ";
+	//if(id ==9)
+	//{
+		cout << "(" << id << ") Source region: ";
+		region_src.print();
+	//}
 	
+	// load and display
 	read_time = 0; render_time = 0;
-	uint start_time;
 
 	unsigned char *buffer1, *buffer2;
-	start_time = Utils::getTime();
 	buffer1 = (unsigned char*)malloc(region_src.width*region_src.height*sizeof(uint32_t));
 	if(!buffer1)
 	{
 		cout << "(" << id << ") Cannot allocate memory for buffer1!" << endl;
 		return -1;
 	}
-	openslide_read_region (osr1, (uint32_t*)buffer1, region_src.left, region_src.top,
-							 level, region_src.width, region_src.height);
-	read_time += Utils::getTime() - start_time;
-	if(!buffer1)
-	{
-		cout << "(" << id << ") Cannot read region 1!" << endl;
-		return -1;
-	}
-	start_time = Utils::getTime();
-	tex1->update(buffer1, region_src.width, region_src.height);
-	render_time += Utils::getTime() - start_time;
+	unsigned int start_t = Utils::getTime();
+	getImageRegion(buffer1, level, region_src, 0);
+	read_time += Utils::getTime() - start_t;
 
 	if(stereo)
 	{
-		start_time = Utils::getTime();
 		buffer2 = (unsigned char*)malloc(region_src.width*region_src.height*sizeof(uint32_t));
 		if(!buffer2)
 		{
 			cout << "(" << id << ") Cannot allocate memory for buffer2!" << endl;
 			return -1;
 		}
-		openslide_read_region (osr2, (uint32_t*)buffer2, region_src.left, region_src.top,
-								 level, region_src.width, region_src.height);
-		read_time += Utils::getTime() - start_time;
-		if(!buffer2)
-		{
-			cout << "(" << id << ") Cannot read region 2!" << endl;
-			return -1;
-		}
-		start_time = Utils::getTime();
-		tex2->update(buffer2, region_src.width, region_src.height);
-		render_time += Utils::getTime() - start_time;
-		leftfirst = (region_dis.top % 2 == 0) ? true : false;
+		unsigned int start_t = Utils::getTime();
+		getImageRegion(buffer2, level, region_src, 1);
+		read_time += Utils::getTime() - start_t;
 	}
+
+	//write to test
+	//if(id == 2)
+	//	writeJPEG(buffer1, region_src.width, region_src.height, "testdata/test.jpeg", 90);
+
+	start_t = Utils::getTime();
+	tex1->update(buffer1, region_src.width, region_src.height);
+	if(stereo)
+		tex2->update(buffer2, region_src.width, region_src.height);
 
 	tranMat.identity();
 	tranMat.scale(Vector3(1.0*region_dis.width/width, 1.0*region_dis.height/height, 1.0));
 	tranMat.translate(Vector3( 2.0*(region_dis.left+region_dis.width/2 - width/2)/width, 
 							-2.0*(region_dis.top+region_dis.height/2 - height/2)/height, 0));
-	start_time = Utils::getTime();
 	draw();
-	render_time += Utils::getTime() - start_time;
-
+	render_time += Utils::getTime() - start_t;
+	
 	free(buffer1);
 	if(stereo)
 		free(buffer2);
-	
+
 	return 0;
-}
-
-void VSDisplay::draw()
-{
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	glClearColor(0.0f,0.0f,0.0f,0.0f);
-
-	if(!stereo)
-	{
-		shaderDisplay->bind();
-		tex1->bind();
-		shaderDisplay->transmitUniform("texScene", tex1);
-		shaderDisplay->transmitUniform("tranMat", tranMat);
-	}
-	else
-	{
-		shaderDisplay3d->bind();
-		tex1->bind();
-		shaderDisplay3d->transmitUniform("texScene1", tex1);
-		tex2->bind();
-		shaderDisplay3d->transmitUniform("texScene2", tex2);
-		shaderDisplay3d->transmitUniform("tranMat", tranMat);
-		shaderDisplay3d->transmitUniform("leftFirst", leftfirst);
-	}
-	
-    quad->draw();
-
-	glfwSwapBuffers(window);
 }

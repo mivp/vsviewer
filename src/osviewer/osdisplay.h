@@ -33,74 +33,44 @@
 **
 **~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
-#ifndef VSCLIENT_H__
-#define VSCLIENT_H__
+#ifndef OSDISPLAY_H__
+#define OSDISPLAY_H__
 
-#include "glinclude.h"
-#include "texture.h"
-#include "shader.h"
-#include "ssquad.h"
+#include "display.h"
+#include "pyramid.h"
 
 #include <openslide.h>
+#include <omicron/Thread.h>
 
 #include <iostream>
+#include <list>
 using namespace std;
 
-#define MODE_REFRESH 0
-#define MODE_FAST 1
-#define MODE_NORMAL 2
-#define MODE_HIGH 3
-
-struct Reg_t{
-	int64_t left,top;
-	int64_t width,height;
-	void print()
-	{
-		cout << left << " " << top << " " << width << " " << height << endl;
-	}
-};
-
-struct Img_t{
-	int type; // 0: single image, 1: stereo l first, 2: stereo r first
-	string filename1;
-	string filename2;
-};
-
-class VSDisplay
+// main class
+class OSDisplay: public Display
 {
 private: 
-	int id, index, width, height;
+	int buffersize;
+
+	list<JPEG_t*> level_imgs1;
+	list<JPEG_t*> level_imgs2;
+	Pyramid* pyramids[2];
+
+	static list<omicron::Thread*> sImageLoaderThread;
+	static int sNumLoaderThreads;
+
+public:
+	OSDisplay(int ind, int w, int h);
+	~OSDisplay();
 	
-	openslide_t *osr1, *osr2;
-	int64_t level0_w, level0_h;
-	int fastlevel;
-	int maxlevel;
-	double maxdownsample;
+	virtual int loadVirtualSlide(Img_t img);
+	virtual int display(int left=0, int top=0, int mode=MODE_REFRESH);
+	virtual int display(int left, int top, double downsample, int mode=MODE_REFRESH); //0: refresh only, 1: fast, 2: normal, 3: high quality
 
-	bool stereo;
-	bool leftfirst;
-	Texture *tex1, *tex2;
-	Shader* shaderDisplay;
-	Shader* shaderDisplay3d;
-	SSQuad* quad;
-	Matrix4 tranMat;
-
-public:
-	GLFWwindow* window;
-	uint read_time, render_time;
-
-public:
-	VSDisplay(int ind, int w, int h);
-	~VSDisplay();
-
-	void getLevel0Size(int64_t &w, int64_t &h) { w = level0_w; h = level0_h; }
-	double getMaxDownsample() { return maxdownsample; }
-
-	int loadVirtualSlide(Img_t img);
-	int initDisplay();
-	int display(int left=0, int top=0, int mode=MODE_REFRESH);
-	int display(int left, int top, double downsample, int mode=MODE_REFRESH); //0: refresh only, 1: fast, 2: normal, 3: high quality
-	void draw();
+	void setNumThreads(int _thread) {sNumLoaderThreads = _thread;}
+	void clearBuffer();
+	void setBufferSize(int _buffersize) {buffersize = _buffersize;}
+	int getImageRegion(unsigned char* buffer1, int level, Reg_t region_src, int index=0);
 };
 
 #endif

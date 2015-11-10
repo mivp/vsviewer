@@ -69,7 +69,7 @@ protected:
 	int maxlevel;
 	double maxdownsample;
 	
-	uint64_t level0_w, level0_h;
+	int64_t level0_w, level0_h;
 	
 	bool stereo, leftfirst;
 	Texture *tex1, *tex2;

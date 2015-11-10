@@ -33,8 +33,8 @@
 **
 **~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
-#ifndef VSCLIENT_H__
-#define VSCLIENT_H__
+#ifndef DZDISPLAY_H__
+#define DZDISPLAY_H__
 
 #include "display.h"
 #include "pyramid.h"
@@ -71,8 +71,6 @@ public:
 	void setNumThreads(int _thread) {sNumLoaderThreads = _thread;}
 	void clearBuffer();
 	void setBufferSize(int _buffersize) {buffersize = _buffersize;}
-	JPEG_t* loadJPEG(const char* filename);
-	int writeJPEG (unsigned char* pixels, int w, int h, const char * filename, int quality = 90);
 	int getImageRegion(unsigned char* buffer1, int level, Reg_t region_src, int index=0);
 };
 

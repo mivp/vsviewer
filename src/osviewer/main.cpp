@@ -33,8 +33,7 @@
 **
 **~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
-//#include "vsdisplay.h"
-#include "dzdisplay.h"
+#include "osdisplay.h"
 
 #include <mpi.h>
 #include <iostream>
@@ -44,15 +43,6 @@
 #include <math.h>
 
 #include <omicron.h>
-
-#include <stdio.h>  /* defines FILENAME_MAX */
-#ifdef WINDOWS
-    #include <direct.h>
-    #define GetCurrentDir _getcwd
-#else
-    #include <unistd.h>
-    #define GetCurrentDir getcwd
- #endif
 
 char keyOnce[GLFW_KEY_LAST + 1];
 #define glfwGetKeyOnce(WINDOW, KEY)             \
@@ -65,14 +55,15 @@ using namespace std;
 
 static int numprocs;
 
-double gleft = 0;
-double gtop = 0;
-double gdownsample = 1;
+Control_t gcontrol;
+
 int cwidth, cheight;
 double maxdownsample;
+int buffersize = 16;
+int numthreads = 2;
 
-double zoom_amount = 0.05;
-double pan_amount = 0.005;
+double zoom_amount = 0.1;
+double pan_amount = 0.01;
 
 string str_system = "desktop";
 vector<Img_t> filenames;
@@ -83,10 +74,12 @@ ServiceManager* sm;
 void usage()
 {
 	cout << endl;
-	cout << "Usage: ./vsviewer [-h] [-s system] [-n] [-i img1] [-l img2l img2r]" << endl;
+	cout << "Usage: ./vsviewer [-h] [-s system] [-n] [-b buffersize] [-t numthreads] [-i img1] [-l img2l img2r]" << endl;
 	cout << "  -s: system {desktop, cave2}. Default: desktop" << endl;
 	cout << "  -n: dont use Omicron (wand controller)" << endl;
 	cout << "  -h: print this help" << endl;
+	cout << "  -b: bufer size. Default = 16" << endl;
+	cout << "  -t: number of reading threads. Default = 2" << endl;
 	cout << "  -i: single file" << endl;
 	cout << "  -l: stereo, left first" << endl;
 	cout << "  -r: stereo, right first" << endl;
@@ -94,57 +87,26 @@ void usage()
 	cout << endl;
 }
 
-string getParametersString(int mode = 0)
+int initOmicron()
 {
-	std::ostringstream ss;
-	ss << "U " << mode << " " << int64_t(gleft) << " " << int64_t(gtop) << " " << gdownsample;
-	return ss.str();
-}
+    DataManager* dm = DataManager::getInstance();
+    char cCurrentPath[FILENAME_MAX];
+    if (!GetCurrentDir(cCurrentPath, sizeof(cCurrentPath)))
+    {
+        return errno;
+    }
+    dm->setCurrentPath(cCurrentPath);
+    cout << "Current path: " << dm->getCurrentPath() << endl;
 
-void parseParametersString(const char* buff, int& mode, int64_t& l, int64_t& t, double& ds)
-{
-	istringstream iss(buff);
-	string sub;
-	iss >> sub; 
-	iss >> sub; mode = atoi(sub.c_str());
-	iss >> sub; l = atoi(sub.c_str());
-	iss >> sub; t = atoi(sub.c_str());
-	iss >> sub; ds = atof(sub.c_str());
-}
+    Config* cfg = new Config("default.cfg");
+    cfg->load();
 
-void pan(int direction, double amount)
-{
-	switch(direction)
-	{
-		case(0): // LEFT
-			gleft -= amount;
-			break;
-		case(1): // RIGHT
-			gleft += amount;
-			break;
-		case(2): // UP
-			gtop -= amount;
-			break;
-		case(3):
-			gtop += amount;
-			break;
-	}
-}
+    // Start services and begin listening to events.
+    cout << "Connecting to tracking machine..." << endl;
+    sm = new ServiceManager();
+    sm->setupAndStart(cfg);
 
-void zoom(int64_t w, int64_t h, int numprocs, double amount)
-{
-	double prev_w = 1.0 * w / gdownsample;
-	
-	gdownsample += amount;
-	if(gdownsample < 0.3)
-		gdownsample = 0.3;
-	if(gdownsample > maxdownsample)
-		gdownsample = maxdownsample;
-
-	double cur_w = 1.0 * w / gdownsample;
-	double ratio = (prev_w-cur_w) / prev_w;
-	gleft = gleft + abs((numprocs-1)*cwidth/2-gleft)*ratio;
-	gtop = gtop + abs(cheight/2-gtop)*ratio;
+    return 0;
 }
 
 int initParameters(int argc, char* argv[], int myid)
@@ -166,6 +128,16 @@ int initParameters(int argc, char* argv[], int myid)
 		else if (strcmp(argv[i],"-n")==0)
 		{
 			noomicron = true;
+			i++;
+		}
+		else if (strcmp(argv[i], "-b")==0)
+		{
+			buffersize = atoi(argv[++i]);
+			i++;
+		}
+		else if(strcmp(argv[i], "-t") ==0)
+		{
+			numthreads = atoi(argv[++i]);
 			i++;
 		}
 		else if (strcmp(argv[i],"-i")==0)
@@ -215,8 +187,8 @@ int initParameters(int argc, char* argv[], int myid)
 	{
 		cwidth = 400;
 		cheight = 800;
-		zoom_amount *= 10;
-		pan_amount *= 5;
+		zoom_amount *= 5;
+		pan_amount *= 2;
 	}
 	else
 	{
@@ -237,39 +209,7 @@ int initParameters(int argc, char* argv[], int myid)
 	return 0;
 }
 
-int initOmicron()
-{
-	DataManager* dm = DataManager::getInstance();
-	char cCurrentPath[FILENAME_MAX];
-	if (!GetCurrentDir(cCurrentPath, sizeof(cCurrentPath)))
-    {
-    	return errno;
-    }
-	dm->setCurrentPath(cCurrentPath);
-	cout << "Current path: " << dm->getCurrentPath() << endl;
-
-	Config* cfg = new Config("default.cfg");
-    cfg->load();
-
-    // Start services and begin listening to events.
-    cout << "Connecting to tracking machine..." << endl;
-	sm = new ServiceManager();
-	sm->setupAndStart(cfg);
-
-	return 0;
-}
-
-int resetParameters(DZDisplay* display, int64_t w, int64_t h, int numprocs)
-{
-	gdownsample = 1.0 * w / ((numprocs-1)*cwidth);
-  	if (gdownsample < 1.0)
-  		gdownsample = 1.0;
-  	gleft = ((numprocs-1)*cwidth - w/gdownsample) / 2;
-  	gtop = (cheight - h/gdownsample) / 2;
-  	maxdownsample = display->getMaxDownsample();
-}
-
-int loadNextFile(DZDisplay* display, int& file_index, int numprocs)
+int loadNextFile(OSDisplay* display, int& file_index, int numprocs)
 {
 	if(filenames.size() > 1)
 	{
@@ -282,7 +222,8 @@ int loadNextFile(DZDisplay* display, int& file_index, int numprocs)
 		display->loadVirtualSlide(filenames[file_index]);
 		int64_t w, h;
 		display->getLevel0Size(w, h);
-		resetParameters(display, w, h, numprocs);
+		Utils::resetParameters(w, h, cwidth, cheight, numprocs, gcontrol);
+		maxdownsample = display->getMaxDownsample();
 		display->display(0, 0);
 		std::ostringstream ss;
 		ss << "N " << file_index;
@@ -320,7 +261,7 @@ int main( int argc, char* argv[] ){
 	{
 		int file_index = 0;
 
-		DZDisplay* display = new DZDisplay(0, 800, 600);
+		OSDisplay* display = new OSDisplay(0, 800, 600);
 		display->initDisplay();
 	  	if(display->loadVirtualSlide(filenames[0]) != 0)
 	  		return -1;
@@ -329,7 +270,8 @@ int main( int argc, char* argv[] ){
 
 	  	int64_t w, h;
 	  	display->getLevel0Size(w, h);
-	  	resetParameters(display, w, h, numprocs);
+	  	Utils::resetParameters(w, h, cwidth, cheight, numprocs, gcontrol);
+	  	maxdownsample = display->getMaxDownsample();
 
 	  	// wand service
 	  	if(!noomicron)
@@ -347,7 +289,7 @@ int main( int argc, char* argv[] ){
     	} 
 
     	//display
-    	string msg = getParametersString(3);
+    	string msg = Utils::getParametersString(gcontrol, MODE_NORMAL);
         cout << "Send: " << msg << endl;
     	for(i=1;i<numprocs;i++)  
     		MPI_Send((char*)msg.c_str(), 256, MPI_CHAR, i, 0, MPI_COMM_WORLD);
@@ -378,22 +320,22 @@ int main( int argc, char* argv[] ){
 			}
 
 			if( glfwGetKey(display->window, GLFW_KEY_LEFT ) )
-				pan(0, pan_amount*w/gdownsample);
+				Utils::pan(0, pan_amount*w/gcontrol.downsample, gcontrol);
 		
 			else if ( glfwGetKey(display->window, GLFW_KEY_RIGHT ) )
-				pan(1, pan_amount*w/gdownsample);
+				Utils::pan(1, pan_amount*w/gcontrol.downsample, gcontrol);
 		
 			else if ( glfwGetKey(display->window, GLFW_KEY_UP ) )
-				pan(2, pan_amount*h/gdownsample);
+				Utils::pan(2, pan_amount*h/gcontrol.downsample, gcontrol);
 		
 			else if ( glfwGetKey(display->window, GLFW_KEY_DOWN ) )
-				pan(3, pan_amount*h/gdownsample);
+				Utils::pan(3, pan_amount*h/gcontrol.downsample, gcontrol);
 			
 			else if ( glfwGetKey(display->window, GLFW_KEY_PAGE_UP ) )
-				zoom(w, h, numprocs, -zoom_amount);
+				Utils::zoom(w, h, cwidth, cheight, numprocs, maxdownsample, -zoom_amount, gcontrol);
 			
 			else if ( glfwGetKey(display->window, GLFW_KEY_PAGE_DOWN ) )
-				zoom(w, h, numprocs, zoom_amount);
+				Utils::zoom(w, h, cwidth, cheight, numprocs, maxdownsample, zoom_amount, gcontrol);
 			
 			else if ( glfwGetKeyOnce(display->window, GLFW_KEY_N ) )
 			{
@@ -410,7 +352,7 @@ int main( int argc, char* argv[] ){
 			if(update)
     		{
     			//display->display(gleft*move_ratio, gtop*move_ratio);
-    			msg = getParametersString(mode);
+    			msg = Utils::getParametersString(gcontrol, mode);
     			cout << "Send: " << msg << endl;
     			for(i=1;i<numprocs;i++)  
 					MPI_Send((char*)msg.c_str(), 256, MPI_CHAR, i, 0, MPI_COMM_WORLD);
@@ -448,22 +390,22 @@ int main( int argc, char* argv[] ){
 								}
 								break;
 							case Event::Button3: // X
-								zoom(w, h, numprocs, zoom_amount);
+								Utils::zoom(w, h, cwidth, cheight, numprocs, maxdownsample, zoom_amount, gcontrol);
 								break;
 							case Event::Button2: // O
-								zoom(w, h, numprocs, -zoom_amount);
+								Utils::zoom(w, h, cwidth, cheight, numprocs, maxdownsample, -zoom_amount, gcontrol);
 								break;					
 							case Event::ButtonLeft:
-								pan(0, pan_amount*w/gdownsample);
+								Utils::pan(0, pan_amount*w/gcontrol.downsample, gcontrol);
 								break;
 							case Event::ButtonRight:
-								pan(1, pan_amount*w/gdownsample);
+								Utils::pan(1, pan_amount*w/gcontrol.downsample, gcontrol);
 								break;	
 							case Event::ButtonUp:
-								pan(2, pan_amount*h/gdownsample);
+								Utils::pan(2, pan_amount*h/gcontrol.downsample, gcontrol);
 								break;
 							case Event::ButtonDown:
-								pan(3, pan_amount*h/gdownsample);
+								Utils::pan(3, pan_amount*h/gcontrol.downsample, gcontrol);
 								break;
 							default:
 								update = false;
@@ -472,7 +414,7 @@ int main( int argc, char* argv[] ){
 						if(update)
 	            		{
 	            			//display->display(gleft*move_ratio, gtop*move_ratio);
-	            			msg = getParametersString(mode);
+	            			msg = Utils::getParametersString(gcontrol, mode);
 	            			cout << "Send: " << msg << endl;
 	            			for(i=1;i<numprocs;i++)  
 	    						MPI_Send((char*)msg.c_str(), 256, MPI_CHAR, i, 0, MPI_COMM_WORLD);
@@ -481,17 +423,15 @@ int main( int argc, char* argv[] ){
 	    					t_start = Utils::getTime();
 	    					need_full_update = true;
 	            		}
-
 					}
 				}
 			}		
-
-        	if(need_full_update)
+			if(need_full_update)
         	{
         		uint timediff = Utils::getTime() - t_start;
         		if(timediff > 500)
         		{
-        			msg = getParametersString(MODE_NORMAL);
+        			msg = Utils::getParametersString(gcontrol, MODE_NORMAL);
             		cout << "Send: " << msg << endl;
         			for(i=1;i<numprocs;i++)  
     					MPI_Send((char*)msg.c_str(), 256, MPI_CHAR, i, 0, MPI_COMM_WORLD);
@@ -504,7 +444,9 @@ int main( int argc, char* argv[] ){
 	}  
 	else  // clients
 	{  
-		DZDisplay* display = new DZDisplay(myid, cwidth, cheight);
+		OSDisplay* display = new OSDisplay(myid, cwidth, cheight);
+		display->setBufferSize(buffersize);
+		display->setNumThreads(numthreads);
 		display->initDisplay();
 	  	if(display->loadVirtualSlide(filenames[0]) == -1)
 	  		return -1;
@@ -527,7 +469,7 @@ int main( int argc, char* argv[] ){
 			}
 			else if(buff[0] == 'U')
 			{
-				parseParametersString(buff, mode, l, t, ds);
+				Utils::parseParametersString(buff, mode, l, t, ds);
 				display->display(l, t, ds, mode);
 
 				if(myid == 9)

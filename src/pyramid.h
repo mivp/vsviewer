@@ -5,6 +5,8 @@
 #include <vector>
 using std::vector;
 
+#include <openslide.h>
+
 // for fast look up
 class Level
 {
@@ -29,6 +31,7 @@ public:
 	Pyramid();
 	~Pyramid();
 	int build(int64_t width, int64_t height, int tilesize);
+	int build(openslide_t *osr, int tilesize);
 	int setValue(int level, int col, int row, int value);
 	int getValue(int level, int col, int row);
 	int print();

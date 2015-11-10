@@ -253,18 +253,18 @@ int DZDisplay::getImageRegion(unsigned char* buffer, int level, Reg_t region_src
 	{
 		for(int r = first_t_row; r <= last_t_row; r++)
 		{
-			int ret = pyramids[index]->getValue(level, c, r);
-			if(ret == -1)
-				cout << "Pyramid problem!!! level:" << level << " c: " << c << " r: " << r << endl;
+			//int ret = pyramids[index]->getValue(level, c, r);
+			//if(ret == -1)
+			//	cout << "Pyramid problem!!! level:" << level << " c: " << c << " r: " << r << endl;
 			if(pyramids[index]->getValue(level, c, r) == 0)
 			{
 				JPEG_t* jpeg = new JPEG_t;
 				jpeg->level = level; jpeg->col = c; jpeg->row = r;
 				jpeg->ready = false;
+				jpeg->leftright = index;
 				std::stringstream ss;
 				if(index == 0)
-				{
-					jpeg->leftright = 0;
+				{			
 					ss << datadir1 << level << "/" << c << "_" << r << ".jpeg";
 					jpeg->path = ss.str();
 					level_imgs1.push_back(jpeg);
@@ -280,7 +280,6 @@ int DZDisplay::getImageRegion(unsigned char* buffer, int level, Reg_t region_src
 				}
 				else
 				{
-					jpeg->leftright = 1;
 					ss << datadir2 << level << "/" << c << "_" << r << ".jpeg";
 					jpeg->path = ss.str();
 					level_imgs2.push_back(jpeg);

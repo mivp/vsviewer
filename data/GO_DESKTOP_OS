@@ -1,0 +1,12 @@
+#!/bin/sh
+
+usage() {
+	echo "Usage: ./GO_CAVE2_OS [-b buffersize] [-i file] [-l file_l file_r]"
+}
+
+for var in "$@"
+do
+    args=`echo $args $var`
+done
+
+mpirun -np 3 --default-hostfile machine-local osviewer -s desktop -n $args

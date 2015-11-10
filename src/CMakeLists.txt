@@ -9,6 +9,7 @@ SET( srcs
 		shaderlibrary.cpp
 		tinyxml2.cpp
 		display.cpp
+		pyramid.cpp
 		)
 
 # Build common

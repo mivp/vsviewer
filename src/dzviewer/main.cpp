@@ -289,7 +289,7 @@ int main( int argc, char* argv[] ){
     	} 
 
     	//display
-    	string msg = Utils::getParametersString(gcontrol, 3);
+    	string msg = Utils::getParametersString(gcontrol, MODE_NORMAL);
         cout << "Send: " << msg << endl;
     	for(i=1;i<numprocs;i++)  
     		MPI_Send((char*)msg.c_str(), 256, MPI_CHAR, i, 0, MPI_COMM_WORLD);
