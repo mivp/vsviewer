@@ -36,6 +36,10 @@ include_directories(${OMICRON_INCLUDE_DIRS})
 find_package(JPEG REQUIRED)
 include_directories(${JPEG_INCLUDE_DIR})
 
+# OpenSlide
+PKG_SEARCH_MODULE(OPENSLIDE REQUIRED openslide)
+include_directories(${OPENSLIDE_INCLUDE_DIRS})
+
 # Set output paths
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
@@ -55,6 +59,7 @@ set(ALL_LIBS
 	${MPI_LIBRARIES}
 	${OMICRON_LIB}
 	${JPEG_LIBRARIES}
+	${OPENSLIDE_LIBRARIES} 
 )
 
 # Compile apps
@@ -64,4 +69,4 @@ SET(CMAKE_C_COMPILER mpicc)
 SET(CMAKE_CXX_COMPILER mpicxx)
 add_subdirectory (src)
 add_subdirectory (src/dzviewer)
-#add_subdirectory (src/vsviewer)
+add_subdirectory (src/osviewer)

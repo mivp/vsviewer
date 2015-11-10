@@ -76,6 +76,27 @@ int Pyramid::build(int64_t width, int64_t height, int tilesize)
 	return 0;
 }
 
+int Pyramid::build(openslide_t *osr, int tilesize)
+{
+	levels.clear();
+
+	maxlevel = openslide_get_level_count(osr)-1;
+	int64_t w, h;
+	int ncols, nrows;
+	for(int level=0; level <= maxlevel; level++)
+	{
+		openslide_get_level_dimensions(osr, level, &w, &h);
+		//cout << "level: " << level << " w: " << w << " h: " << h << endl;
+		ncols = w / tilesize + 1;
+		nrows = h / tilesize + 1;
+		Level* l = new Level();
+		l->build(level, ncols, nrows);
+		levels.push_back(l);
+	}
+
+	return 0;
+}
+
 int Pyramid::setValue(int level, int col, int row, int value)
 {
 	if(level > maxlevel)

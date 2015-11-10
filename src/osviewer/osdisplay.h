@@ -33,12 +33,13 @@
 **
 **~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
-#ifndef DZDISPLAY_H__
-#define DZDISPLAY_H__
+#ifndef OSDISPLAY_H__
+#define OSDISPLAY_H__
 
 #include "display.h"
 #include "pyramid.h"
 
+#include <openslide.h>
 #include <omicron/Thread.h>
 
 #include <iostream>
@@ -46,23 +47,21 @@
 using namespace std;
 
 // main class
-class DZDisplay: public Display
+class OSDisplay: public Display
 {
 private: 
-	int tilesize;
 	int buffersize;
 
 	list<JPEG_t*> level_imgs1;
 	list<JPEG_t*> level_imgs2;
-	string datadir1, datadir2;
 	Pyramid* pyramids[2];
 
 	static list<omicron::Thread*> sImageLoaderThread;
 	static int sNumLoaderThreads;
 
 public:
-	DZDisplay(int ind, int w, int h, int numclients);
-	~DZDisplay();
+	OSDisplay(int ind, int w, int h);
+	~OSDisplay();
 	
 	virtual int loadVirtualSlide(Img_t img);
 	virtual int display(int left=0, int top=0, int mode=MODE_REFRESH);

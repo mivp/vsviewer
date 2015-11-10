@@ -33,12 +33,11 @@
 **
 **~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
-#include "dzdisplay.h"
+#include "osdisplay.h"
 
 #include "utils.h"
 #include "glutils.h"
 #include "shaderlibrary.h"
-#include "tinyxml2.h"
 
 #include <iostream>
 #include <sstream>
@@ -48,14 +47,16 @@
 #include <memory.h>
 
 using namespace std;
-using namespace tinyxml2;
 using namespace omicron;
 
 //global
+openslide_t *osrs[2];
+int tilesize;
+
 Lock sImageQueueLock;
 bool sShutdownLoaderThread = false;
-int DZDisplay::sNumLoaderThreads = 2;
-list<Thread*> DZDisplay::sImageLoaderThread;
+int OSDisplay::sNumLoaderThreads = 2;
+list<Thread*> OSDisplay::sImageLoaderThread;
 list<JPEG_t*> sImageQueue;
 
 class ImageLoaderThread: public Thread
@@ -79,9 +80,9 @@ public:
                     sImageQueue.pop_front();
                     sImageQueueLock.unlock();
 
-                    //cout << "  Load image: " << jpeg->path << endl;
-                    jpeg->pixels = Utils::loadJPEG(jpeg->path.c_str(), jpeg->width, jpeg->height);
-                    jpeg->data_size = jpeg->width*jpeg->height*3;
+                    jpeg->pixels = Utils::loadTile(osrs[jpeg->leftright], jpeg->level, 
+                    								jpeg->row, jpeg->col, tilesize,	jpeg->width, jpeg->height);
+                    jpeg->data_size = jpeg->width*jpeg->height*sizeof(uint32_t);
 
                     if(!sShutdownLoaderThread)
                     {
@@ -101,15 +102,20 @@ public:
     }
 };
 
-// DZDisplay
-DZDisplay::DZDisplay(int i, int w, int h, int numclients): Display(i, w, h, numclients)
+// OSDisplay
+OSDisplay::OSDisplay(int i, int w, int h): Display(i, w, h)
 {
 	buffersize = 16;
 	level_imgs1.clear();
 	level_imgs2.clear();
 
+	osrs[0] = NULL;
+	osrs[1] = NULL;
+
 	pyramids[0] = new Pyramid();
 	pyramids[1] = new Pyramid();
+
+	tilesize = 1024;
 
 	if(i == 0)
 		sNumLoaderThreads = 1;
@@ -125,15 +131,20 @@ DZDisplay::DZDisplay(int i, int w, int h, int numclients): Display(i, w, h, numc
     }
 }
 
-DZDisplay::~DZDisplay()
+OSDisplay::~OSDisplay()
 {
 	clearBuffer();
+
+	if(osrs[0])
+		openslide_close(osrs[0]);
+	if(osrs[1])
+		openslide_close(osrs[1]);
 
 	delete pyramids[0];
 	delete pyramids[1];
 }
 
-void DZDisplay::clearBuffer()
+void OSDisplay::clearBuffer()
 {
 	sImageQueueLock.lock();
 	sImageQueue.clear();
@@ -154,89 +165,81 @@ void DZDisplay::clearBuffer()
     level_imgs2.clear();
 }
 
-int DZDisplay::loadVirtualSlide(Img_t img)
+int OSDisplay::loadVirtualSlide(Img_t img)
 {
 	// clear buffer
 	clearBuffer();
 
-	// parse dzi file
-	cout << "Parse dzi file: " << img.filename1 << endl;
-	XMLDocument doc;
-	doc.LoadFile( img.filename1.c_str() );
-	int errorID = doc.ErrorID();
-	if(errorID)
+	for(int i=0; i<2; i++)
 	{
-		cout << "Fail to open and parse file: " << img.filename1 << endl;
-		return -1;
+		if(osrs[i])
+		{
+			openslide_close(osrs[i]);
+			osrs[i] = NULL;
+		}
 	}
-	XMLElement* imageElement = doc.FirstChildElement( "Image" );
-	imageElement->QueryIntAttribute( "TileSize", &tilesize );
-
-	double temp_w, temp_h;
-	XMLElement* sizeElement = imageElement->FirstChildElement("Size");
-	sizeElement->QueryDoubleAttribute( "Width", &temp_w );
-	sizeElement->QueryDoubleAttribute( "Height", &temp_h );
-	level0_w = int64_t(temp_w);
-	level0_h = int64_t(temp_h);
-	cout << "TileSize: " << tilesize << " Width: " << level0_w << " Height: " << level0_h << endl;
 
 	stereo = false;
 	if(img.type == 0)
 	{
-		datadir1 = img.filename1.substr(0, img.filename1.size() - 4);
-		datadir1.append("_files/");
+		cout << "(" << id << "): Open file: " << img.filename1 << endl;
+		osrs[0] = openslide_open(img.filename1.c_str());
+		assert(osrs[0]);
 	}
 	else if (img.type == 1)
 	{
-		datadir1 = img.filename1.substr(0, img.filename1.size() - 4);
-		datadir1.append("_files/");
-		datadir2 = img.filename2.substr(0, img.filename2.size() - 4);
-		datadir2.append("_files/");
+		cout << "(" << id << "): Open files: " << img.filename1 << " " << img.filename2 << endl;
+		osrs[0] = openslide_open(img.filename1.c_str());
+		osrs[1] = openslide_open(img.filename2.c_str());
+		assert(osrs[0]);
+		assert(osrs[1]);
 		stereo = true;
 	}
 	else if (img.type == 2)
 	{
-		datadir1 = img.filename2.substr(0, img.filename2.size() - 4);
-		datadir1.append("_files/");
-		datadir2 = img.filename1.substr(0, img.filename1.size() - 4);
-		datadir2.append("_files/");
+		cout << "(" << id << "): Open files: " << img.filename2 << " " << img.filename1 << endl;
+		osrs[0] = openslide_open(img.filename2.c_str());
+		osrs[1] = openslide_open(img.filename1.c_str());
+		assert(osrs[0]);
+		assert(osrs[1]);
 		stereo = true;
 	}
-	else
-	{
-		cout << "Invalid type" << endl;
-		return -1;
-	}
-	cout << "datadir1: " << datadir1 << " datadir2: " << datadir2 << endl;
 	
+	//cout << "(" << id << ") Version: " << openslide_get_version() << endl;
+	cout << "(" << id << ") Num level: " << openslide_get_level_count(osrs[0]) << endl;
+	openslide_get_level_dimensions(osrs[0], 0, &level0_w, &level0_h);
+	cout << "(" << id << ") Level 0 dimensions: " << level0_w << " " << level0_h << endl;
+
+	maxlevel = openslide_get_level_count(osrs[0]);
+
 	maxdownsample = 2.0 * level0_w / 1024;
 
 	// texture
 	if(tex1 == NULL)
 	{
-		tex1 = Texture::newFromNextUnit(width, height, GL_RGB, GL_BGR);
+		tex1 = Texture::newFromNextUnit(width, height);
 		tex1->init();
 	}
 
 	if(stereo && tex2 == NULL)
 	{
-		tex2 = Texture::newFromNextUnit(width, height, GL_RGB, GL_BGR);
+		tex2 = Texture::newFromNextUnit(width, height);
 		tex2->init();
 	}
 
 	// indexing
-	pyramids[0]->build(level0_w, level0_h, tilesize);
-	if(id == 18)
+	pyramids[0]->build(osrs[0], tilesize);
+	if(id == 1)
 		pyramids[0]->print();
 	if(stereo)
-		pyramids[1]->build(level0_w, level0_h, tilesize);
+		pyramids[1]->build(osrs[0], tilesize);
 
 	cout << "(" << id << ") loadVirtualSlide completed!" << endl;
 	
 	return 0;
 }
 
-int DZDisplay::getImageRegion(unsigned char* buffer, int level, Reg_t region_src, int index)
+int OSDisplay::getImageRegion(unsigned char* buffer, int level, Reg_t region_src, int index)
 {
 	int first_t_col, first_t_row, last_t_col, last_t_row;
 	first_t_col = region_src.left / tilesize;
@@ -264,9 +267,7 @@ int DZDisplay::getImageRegion(unsigned char* buffer, int level, Reg_t region_src
 				jpeg->leftright = index;
 				std::stringstream ss;
 				if(index == 0)
-				{			
-					ss << datadir1 << level << "/" << c << "_" << r << ".jpeg";
-					jpeg->path = ss.str();
+				{
 					level_imgs1.push_back(jpeg);
 					if(level_imgs1.size() > buffersize)
 					{
@@ -280,8 +281,6 @@ int DZDisplay::getImageRegion(unsigned char* buffer, int level, Reg_t region_src
 				}
 				else
 				{
-					ss << datadir2 << level << "/" << c << "_" << r << ".jpeg";
-					jpeg->path = ss.str();
 					level_imgs2.push_back(jpeg);
 					if(level_imgs2.size() > buffersize)
 					{
@@ -327,7 +326,6 @@ int DZDisplay::getImageRegion(unsigned char* buffer, int level, Reg_t region_src
 						break;
 				}
 			}
-			
 			if(!jpeg)
 			{
 				cout << "(" << id << ") Cannot find image" << endl;
@@ -361,9 +359,9 @@ int DZDisplay::getImageRegion(unsigned char* buffer, int level, Reg_t region_src
 				dest_first_col = 0;
 			for(int i=top; i<bottom; i++)
 			{
-				row_src_ptr = &jpeg->pixels[i*jpeg->width*3 + left*3];
-				row_des_ptr = &buffer[dest_first_row*region_src.width*3 + dest_first_col*3];
-				memcpy(row_des_ptr, (unsigned char*)row_src_ptr, (right-left)*3);
+				row_src_ptr = &jpeg->pixels[i*jpeg->width*sizeof(uint32_t) + left*sizeof(uint32_t)];
+				row_des_ptr = &buffer[dest_first_row*region_src.width*sizeof(uint32_t) + dest_first_col*sizeof(uint32_t)];
+				memcpy(row_des_ptr, (unsigned char*)row_src_ptr, (right-left)*sizeof(uint32_t));
 				dest_first_row++;
 			}
 		}
@@ -372,165 +370,120 @@ int DZDisplay::getImageRegion(unsigned char* buffer, int level, Reg_t region_src
 	return 0;
 }
 
-int DZDisplay::display(int left, int top, int mode)
+int OSDisplay::display(int left, int top, int mode)
 {
 	double downsample = 1.0*level0_w / width;
 	return display(left, top, downsample, mode);
 }
 
-int DZDisplay::display(int left, int top, double downsample, int mode)
+int OSDisplay::display(int left, int top, double downsample, int mode)
 {
-	// get best level
+	int level = openslide_get_best_level_for_downsample(osrs[0], downsample);
+
+	int64_t level_w, level_h;
+	openslide_get_level_dimensions(osrs[0], level, &level_w, &level_h);
+	//cout << "(" << id << ") Level dims: " << level_w << " " << level_h << endl;
+
 	int64_t img_w, img_h;
-	img_w = level0_w / downsample;
-	img_h = level0_h / downsample;
-	//cout << "img_w: " << img_w << " img_h: " << img_h << endl;
+	img_w = int64_t(level0_w / downsample);
+	img_h = int64_t(level0_h / downsample);
+	//cout << "(" << id << ") Image dims: " << img_w << " " << img_h << endl;
+
+	double ratio = 1.0*level_w/img_w;
+	if(mode==MODE_FAST && level < maxlevel && downsample >= 1 && ratio > 1.0)
+	{
+		level++;
+		openslide_get_level_dimensions(osrs[0], level, &level_w, &level_h);
+		ratio = 1.0*level_w/img_w;
+	}
+	//if(id == 9)
+		cout << "(" << id << ") Level: " << level << endl;
 
 	int64_t c_left = width*index;
 	int64_t c_top = 0;
-	bool drawimgage = true;
-
-	drawBegin();
-
 	if(c_left + width < left || c_left > left + img_w || top > height || top+img_h < c_top)
-		drawimgage = false;
-
-	if(drawimgage)
 	{
-		Reg_t region_dis;
-		region_dis.left = (left > c_left) ? left : c_left;
-		region_dis.left -= index*width;
-		region_dis.top = (top > c_top) ? top : c_top;
-		region_dis.width = width - region_dis.left;
-		if(region_dis.width > left + img_w - c_left)
-			region_dis.width = left + img_w - c_left;
-		region_dis.height = (img_h < height) ? img_h : height;
-		if(region_dis.height > top + img_h)
-			region_dis.height = top + img_h;
-		//if(id == 9)
-		//{
-		//	cout << "(" << id << ") Display region: ";
-		//	region_dis.print();
-		//}
+		// render
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		glClearColor(0.0f,0.0f,0.0f,0.0f);
+		glfwSwapBuffers(window);
 
-		//
-		maxlevel = 0;
-		while(pow(2,maxlevel)*tilesize <= level0_w)
-			maxlevel++;
-		//cout << "maxlevel: " << maxlevel << endl;
+		return -1;
+	}
 
-		int level;
-		for(level=0; level < maxlevel; level++)
-			if(pow(2,level)*tilesize > img_w)
-				break;
+	Reg_t region_dis;
+	region_dis.left = (left > c_left) ? left : c_left;
+	region_dis.left -= index*width;
+	region_dis.top = (top > c_top) ? top : c_top;
+	region_dis.width = width - region_dis.left;
+	if(region_dis.width > left + img_w - c_left)
+		region_dis.width = left + img_w - c_left;
+	region_dis.height = (img_h < height) ? img_h : height;
+	if(region_dis.height > top + img_h)
+		region_dis.height = top + img_h;
+	//if(id == 9)
+	//{
+		cout << "(" << id << ") Display region: ";
+		region_dis.print();
+	//}
 
-		double ratio = 1.0*level0_w / pow(2, (maxlevel-level)) / img_w;
+	Reg_t region_src;
+	region_src.left = (region_dis.left + index*width - left) * ratio;
+	region_src.top = (region_dis.top - top) * ratio;
+	region_src.width = region_dis.width*ratio;
+	region_src.height = region_dis.height*ratio;
+	//if(id ==9)
+	//{
+		cout << "(" << id << ") Source region: ";
+		region_src.print();
+	//}
+	
+	// load and display
+	read_time = 0; render_time = 0;
 
-		if(mode==MODE_FAST && level > 0 && downsample >= 1 && ratio > 1.0)
+	unsigned char *buffer1, *buffer2;
+	buffer1 = (unsigned char*)malloc(region_src.width*region_src.height*sizeof(uint32_t));
+	if(!buffer1)
+	{
+		cout << "(" << id << ") Cannot allocate memory for buffer1!" << endl;
+		return -1;
+	}
+	unsigned int start_t = Utils::getTime();
+	getImageRegion(buffer1, level, region_src, 0);
+	read_time += Utils::getTime() - start_t;
+
+	if(stereo)
+	{
+		buffer2 = (unsigned char*)malloc(region_src.width*region_src.height*sizeof(uint32_t));
+		if(!buffer2)
 		{
-			level--;
-			ratio = 1.0*level0_w / pow(2, (maxlevel-level)) / img_w;
-		}
-		if(id == 9)
-			cout << "(" << id << ") Level: " << level << endl;
-
-		Reg_t region_src;
-		region_src.left = (region_dis.left + index*width - left) * ratio;
-		region_src.top = (region_dis.top - top) * ratio;
-		region_src.width = region_dis.width*ratio;
-		region_src.height = region_dis.height*ratio;
-		//if(id ==9)
-		//{
-		//	cout << "(" << id << ") Source region: ";
-		//	region_src.print();
-		//}
-
-		// load and display
-		read_time = 0; render_time = 0;
-
-		unsigned char *buffer1, *buffer2;
-		buffer1 = (unsigned char*)malloc(region_src.width*region_src.height*3);
-		if(!buffer1)
-		{
-			cout << "(" << id << ") Cannot allocate memory for buffer1!" << endl;
+			cout << "(" << id << ") Cannot allocate memory for buffer2!" << endl;
 			return -1;
 		}
 		unsigned int start_t = Utils::getTime();
-		getImageRegion(buffer1, level, region_src, 0);
+		getImageRegion(buffer2, level, region_src, 1);
 		read_time += Utils::getTime() - start_t;
-
-		if(stereo)
-		{
-			buffer2 = (unsigned char*)malloc(region_src.width*region_src.height*3);
-			if(!buffer2)
-			{
-				cout << "(" << id << ") Cannot allocate memory for buffer2!" << endl;
-				return -1;
-			}
-			unsigned int start_t = Utils::getTime();
-			getImageRegion(buffer2, level, region_src, 1);
-			read_time += Utils::getTime() - start_t;
-		}
-
-		//write to test
-		//if(id == 2)
-		//	writeJPEG(buffer1, region_src.width, region_src.height, "testdata/test.jpeg", 90);
-
-		start_t = Utils::getTime();
-		tex1->update(buffer1, region_src.width, region_src.height);
-		if(stereo)
-			tex2->update(buffer2, region_src.width, region_src.height);
-
-		tranMat.identity();
-		tranMat.scale(Vector3(1.0*region_dis.width/width, 1.0*region_dis.height/height, 1.0));
-		tranMat.translate(Vector3( 2.0*(region_dis.left+region_dis.width/2 - width/2)/width, 
-								-2.0*(region_dis.top+region_dis.height/2 - height/2)/height, 0));
-		drawImage();
-		render_time += Utils::getTime() - start_t;
-
-		free(buffer1);
-		if(stereo)
-			free(buffer2);
 	}
 
-	if(id == 1) //draw minimap
-	{
-		Reg_t vis_area;
-		vis_area.left = -left > 0 ? -left : 0;
-		vis_area.top = -top > 0 ? -top : 0;
-		//width
-		if( (left < 0 && -left > img_w) || (left > 0 && left > entire_display_w) )
-			vis_area.width = 0;
-		else
-		{
-			vis_area.width = entire_display_w - left;
-			if(vis_area.width > img_w)
-				vis_area.width = img_w;
-			if(vis_area.width > entire_display_w)
-				vis_area.width = entire_display_w;
-		}
-		//height
-		if( (top < 0 && -top > img_h) || (top > 0 && top > entire_display_h) )
-			vis_area.height = 0;
-		else
-		{
-			vis_area.height = entire_display_h - top;
-			if(vis_area.height > img_h)
-				vis_area.height = img_h;
-			if(vis_area.height > entire_display_h)
-				vis_area.height = entire_display_h;
-		}
+	//write to test
+	//if(id == 2)
+	//	writeJPEG(buffer1, region_src.width, region_src.height, "testdata/test.jpeg", 90);
 
-		float nleft = 1.0*vis_area.left / img_w;
-		float ntop = 1.0*vis_area.top / img_h;
-		float nwidth = 1.0*vis_area.width / img_w;
-		float nheight = 1.0*vis_area.height / img_h;
-		//cout << "nleft: " << nleft << " ntop: " << ntop << " nwidth: " << nwidth << " nheight: " << nheight << endl;
-		if(nwidth >0 && nheight >0)
-			drawMinimap(nleft, ntop, nwidth, nheight);
-	}
+	start_t = Utils::getTime();
+	tex1->update(buffer1, region_src.width, region_src.height);
+	if(stereo)
+		tex2->update(buffer2, region_src.width, region_src.height);
 
-	drawEnd();
+	tranMat.identity();
+	tranMat.scale(Vector3(1.0*region_dis.width/width, 1.0*region_dis.height/height, 1.0));
+	tranMat.translate(Vector3( 2.0*(region_dis.left+region_dis.width/2 - width/2)/width, 
+							-2.0*(region_dis.top+region_dis.height/2 - height/2)/height, 0));
+	draw();
+	render_time += Utils::getTime() - start_t;
+	
+	free(buffer1);
+	if(stereo)
+		free(buffer2);
 
 	return 0;
 }

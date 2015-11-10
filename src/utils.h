@@ -22,6 +22,8 @@ extern "C" {
 }    
 #include <jerror.h>
 
+#include <openslide.h>
+
 using namespace std;
 
 /*!
@@ -86,6 +88,9 @@ public:
     static unsigned char* loadJPEG(const char* filename, unsigned int &width, unsigned int &height);
 
     static int writeJPEG (unsigned char* pixels, int w, int h, const char * filename, int quality);
+
+    static unsigned char* loadTile(openslide_t *osr, int level, int row, int col, const int tilesize,
+                                    unsigned int &width, unsigned int &height);
 };
 
 #endif // UTILS_H

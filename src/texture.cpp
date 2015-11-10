@@ -23,7 +23,7 @@ Texture::Texture(unsigned int _index, unsigned int _width, unsigned int _height,
 {
     height = _height;
     width = _width;
-    format = GL_RGB8;
+    format = _format;
     index = _index;
     glunit = unitFromIndex(_index);
     gluid = 0;

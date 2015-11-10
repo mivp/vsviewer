@@ -204,3 +204,28 @@ int Utils::writeJPEG (unsigned char* pixels, int w, int h, const char * filename
 
     return 0;
 }
+
+unsigned char* Utils::loadTile(openslide_t *osr, int level, int row, int col, int tilesize,
+                        unsigned int &width, unsigned int &height)
+{
+    int64_t level_w, level_h;
+    openslide_get_level_dimensions(osr, level, &level_w, &level_h);
+    int64_t left = col*tilesize;
+    int64_t top = row*tilesize;
+    width = (level_w - left < tilesize) ? level_w - left : tilesize;
+    height = (level_h - top < tilesize) ? level_h - top : tilesize;
+
+    unsigned char *buffer;
+    buffer = (unsigned char*)malloc(width*height*sizeof(uint32_t));
+    if(!buffer)
+        return NULL;
+
+    double downsample = openslide_get_level_downsample(osr, level);
+
+    //cout << "level: " << level << " row: " << row << " col: " << col
+    //     << " width: " << width << " height: " << height << endl;
+    
+    openslide_read_region (osr, (uint32_t*)buffer, left*downsample, top*downsample, level, width, height);
+
+    return buffer;
+}
