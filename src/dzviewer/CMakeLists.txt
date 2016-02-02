@@ -1,5 +1,4 @@
 SET( srcs 
-		pyramid.cpp
 		dzdisplay.cpp
 		main.cpp
 		)

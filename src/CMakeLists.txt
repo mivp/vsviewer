@@ -8,6 +8,7 @@ SET( srcs
 		shader.cpp
 		shaderlibrary.cpp
 		tinyxml2.cpp
+		pyramid.cpp 
 		display.cpp
 		)
 
