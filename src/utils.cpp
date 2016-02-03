@@ -86,8 +86,8 @@ void Utils::zoom(int64_t w, int64_t h, int cwidth, int cheight, int numprocs, do
     double prev_w = 1.0 * w / control.downsample;
 
     double added_amount = control.downsample / maxdownsample * amount;
-    std::cout << "Added amount: " << added_amount << std::endl;
-    std::cout << "Down sample: " << control.downsample << std::endl;
+    //std::cout << "Added amount: " << added_amount << std::endl;
+    //std::cout << "Down sample: " << control.downsample << std::endl;
     
     control.downsample += added_amount;
     if(control.downsample < 0.3)

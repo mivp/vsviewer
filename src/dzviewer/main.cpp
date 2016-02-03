@@ -62,7 +62,8 @@ double maxdownsample;
 int buffersize = 16;
 int numthreads = 2;
 
-double zoom_amount = 0.15;
+double zoom_amount = 0;
+double zoom_factor = 8000;
 double pan_amount = 0.01;
 
 string str_system = "desktop";
@@ -187,8 +188,6 @@ int initParameters(int argc, char* argv[], int myid)
 	{
 		cwidth = 400;
 		cheight = 800;
-		zoom_amount *= 2;
-		pan_amount *= 1;
 	}
 	else
 	{
@@ -233,6 +232,7 @@ int loadNextFile(DZDisplay* display, int& file_index, int numprocs, bool backwar
 		display->getLevel0Size(w, h);
 		Utils::resetParameters(w, h, cwidth, cheight, numprocs, gcontrol);
 		maxdownsample = display->getMaxDownsample();
+		zoom_amount = w / zoom_factor > 0.5 ? w / zoom_factor : 0.5 ;
 		display->display(0, 0);
 		std::ostringstream ss;
 		ss << "N " << file_index;
@@ -281,6 +281,7 @@ int main( int argc, char* argv[] ){
 	  	display->getLevel0Size(w, h);
 	  	Utils::resetParameters(w, h, cwidth, cheight, numprocs, gcontrol);
 	  	maxdownsample = display->getMaxDownsample();
+		zoom_amount = w / zoom_factor > 0.5 ? w / zoom_factor : 0.5 ;
 
 	  	// wand service
 	  	if(!noomicron)
