@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <sstream>
 #include <math.h>
+#include <iostream>
 
 char* Utils::getFileContent(string path)
 {
@@ -83,8 +84,12 @@ void Utils::pan(int direction, double amount, Control_t& control)
 void Utils::zoom(int64_t w, int64_t h, int cwidth, int cheight, int numprocs, double maxdownsample, double amount, Control_t& control)
 {
     double prev_w = 1.0 * w / control.downsample;
+
+    double added_amount = control.downsample / maxdownsample * amount;
+    std::cout << "Added amount: " << added_amount << std::endl;
+    std::cout << "Down sample: " << control.downsample << std::endl;
     
-    control.downsample += amount;
+    control.downsample += added_amount;
     if(control.downsample < 0.3)
         control.downsample = 0.3;
     if(control.downsample > maxdownsample)

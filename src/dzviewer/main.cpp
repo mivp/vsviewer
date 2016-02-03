@@ -62,7 +62,7 @@ double maxdownsample;
 int buffersize = 16;
 int numthreads = 2;
 
-double zoom_amount = 0.1;
+double zoom_amount = 0.15;
 double pan_amount = 0.01;
 
 string str_system = "desktop";
@@ -187,8 +187,8 @@ int initParameters(int argc, char* argv[], int myid)
 	{
 		cwidth = 400;
 		cheight = 800;
-		zoom_amount *= 5;
-		pan_amount *= 2;
+		zoom_amount *= 2;
+		pan_amount *= 1;
 	}
 	else
 	{
