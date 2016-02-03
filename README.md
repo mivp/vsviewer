@@ -22,7 +22,7 @@ Tested on MacOS 10.10 and OpenSuSE 12.3
 * check GO_DESKTOP_DZ_DEMO and GO_CAVE2_DZ_DEMO for examples
 
 ##Usage##
-* keyboard: use LEFT, RIGHT, UP, DOWN to pan; PAGE_UP/PAGE_DOWN to zoom; 'n' to go to next image
+* keyboard: use LEFT, RIGHT, UP, DOWN to pan; PAGE_UP/PAGE_DOWN to zoom; 'n'/'b' to go to next/previous image
 * PS3 move controller: use LEFT, RIGHT, UP, DOWN button to pan; X/O buttons to zoom; L1 button to go to next image
 
 ##Note: Convert to PyramidalTIFF with ImageMagick##

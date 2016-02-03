@@ -209,16 +209,25 @@ int initParameters(int argc, char* argv[], int myid)
 	return 0;
 }
 
-int loadNextFile(DZDisplay* display, int& file_index, int numprocs)
+int loadNextFile(DZDisplay* display, int& file_index, int numprocs, bool backward=false)
 {
 	if(filenames.size() > 1)
 	{
 		char buff_r[1024];
 		MPI_Status stat; 
 
-		file_index++;
-		if(file_index >= filenames.size())
-			file_index = 0;
+		if(backward)
+		{
+			file_index--;
+			if(file_index < 0)
+				file_index = filenames.size() - 1;
+		}
+		else
+		{
+			file_index++;
+			if(file_index >= filenames.size())
+				file_index = 0;
+		}	
 		display->loadVirtualSlide(filenames[file_index]);
 		int64_t w, h;
 		display->getLevel0Size(w, h);
@@ -337,9 +346,15 @@ int main( int argc, char* argv[] ){
 			else if ( glfwGetKey(display->window, GLFW_KEY_PAGE_DOWN ) )
 				Utils::zoom(w, h, cwidth, cheight, numprocs, maxdownsample, zoom_amount, gcontrol);
 			
-			else if ( glfwGetKeyOnce(display->window, GLFW_KEY_N ) )
+			else if ( glfwGetKeyOnce(display->window, GLFW_KEY_N ) ) // next file
 			{
 				loadNextFile(display, file_index, numprocs);
+				display->display(0, 0, 2);
+			}
+
+			else if ( glfwGetKeyOnce(display->window, GLFW_KEY_B ) ) // previous file
+			{
+				loadNextFile(display, file_index, numprocs, true);
 				display->display(0, 0, 2);
 			}
 			
@@ -386,6 +401,13 @@ int main( int argc, char* argv[] ){
 								if(evts[evtNum].getType() == Event::Down)
 								{
 									loadNextFile(display, file_index, numprocs);
+									display->display(0, 0, 2);
+								}
+								break;
+							case Event::Button7: // L2
+								if(evts[evtNum].getType() == Event::Down)
+								{
+									loadNextFile(display, file_index, numprocs, true);
 									display->display(0, 0, 2);
 								}
 								break;
