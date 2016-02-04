@@ -187,12 +187,12 @@ int Display::loadVirtualSlide(Img_t img)
 	return 0;
 }
 
-int Display::display(int left, int top, DISPLAY_MODE mode)
+int Display::display(int left, int top, DISPLAY_MODE mode, bool minimap)
 {
 	return 0;
 }
 
-int Display::display(int left, int top, double downsample, DISPLAY_MODE mode)
+int Display::display(int left, int top, double downsample, DISPLAY_MODE mode, bool minimap)
 {
 	return 0;
 }

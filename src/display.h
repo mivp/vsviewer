@@ -104,8 +104,8 @@ public:
 	void drawEnd();
 
 	virtual int loadVirtualSlide(Img_t img);
-	virtual int display(int left=0, int top=0, DISPLAY_MODE mode=MODE_REFRESH);
-	virtual int display(int left, int top, double downsample, DISPLAY_MODE mode=MODE_REFRESH);
+	virtual int display(int left=0, int top=0, DISPLAY_MODE mode=MODE_REFRESH, bool minimap=false);
+	virtual int display(int left, int top, double downsample, DISPLAY_MODE mode=MODE_REFRESH, bool minimap=false);
 };
 
 #endif
