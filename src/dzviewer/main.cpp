@@ -188,6 +188,7 @@ int initParameters(int argc, char* argv[], int myid)
 	{
 		cwidth = 400;
 		cheight = 800;
+		pan_amount = 0.001;
 	}
 	else
 	{
@@ -270,7 +271,7 @@ int main( int argc, char* argv[] ){
 	{
 		int file_index = 0;
 
-		DZDisplay* display = new DZDisplay(0, 800, 600);
+		DZDisplay* display = new DZDisplay(0, 800, 600, numprocs - 1);
 		display->initDisplay();
 	  	if(display->loadVirtualSlide(filenames[0]) != 0)
 	  		return -1;
@@ -467,7 +468,7 @@ int main( int argc, char* argv[] ){
 	}  
 	else  // clients
 	{  
-		DZDisplay* display = new DZDisplay(myid, cwidth, cheight);
+		DZDisplay* display = new DZDisplay(myid, cwidth, cheight, numprocs - 1);
 		display->setBufferSize(buffersize);
 		display->setNumThreads(numthreads);
 		display->initDisplay();

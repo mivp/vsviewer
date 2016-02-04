@@ -48,12 +48,15 @@
 
 using namespace std;
 
-Display::Display(int i, int w, int h): id(i), width(w), height(h), stereo(false), leftfirst(true),
+Display::Display(int i, int w, int h, int numclients): id(i), width(w), height(h), stereo(false), leftfirst(true),
 											tex1(NULL), tex2(NULL)
 {
 	index = id - 1;
 	if (index < 0)
 		index = 0;
+
+    entire_display_w =  numclients * w;
+    entire_display_h = h;
 }
 
 Display::~Display()
@@ -121,18 +124,32 @@ int Display::initDisplay()
     ShaderLibrary::addShader("ss_display3d", "shaders/ss_display3d", attributes, uniforms);
     shaderDisplay3d = ShaderLibrary::getShader("ss_display3d");
 
+    attributes.clear(); uniforms.clear();
+    attributes.push_back("position");
+    uniforms.push_back("colour");
+    ShaderLibrary::addShader("ss_draw_colour", "shaders/ss_draw_colour", attributes, uniforms);
+    shaderDrawColour = ShaderLibrary::getShader("ss_draw_colour");
+
     // quad
     quad = new SSQuad();
     quad->init();
+
+    // init rect display
+    glGenVertexArrays(1, &rect_vao);
+    glBindVertexArray(rect_vao);
+
+    glGenBuffers(1, &rect_vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, rect_vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(float)*12, NULL, GL_DYNAMIC_DRAW);
+
+    glEnableVertexAttribArray(0);  // position
+    glVertexAttribPointer( 0, 2, GL_FLOAT, GL_FALSE, 0, (GLubyte *)NULL );
 	
 	return 0;
 }
 
-void Display::draw()
+void Display::drawImage()
 {
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	glClearColor(0.0f,0.0f,0.0f,0.0f);
-
 	if(!stereo)
 	{
 		shaderDisplay->bind();
@@ -152,8 +169,17 @@ void Display::draw()
 	}
 	
     quad->draw();
+}
 
-	glfwSwapBuffers(window);
+void Display::drawBegin()
+{
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glClearColor(0.0f,0.0f,0.0f,0.0f);
+}
+
+void Display::drawEnd()
+{
+    glfwSwapBuffers(window);
 }
 
 int Display::loadVirtualSlide(Img_t img)
@@ -169,4 +195,53 @@ int Display::display(int left, int top, DISPLAY_MODE mode)
 int Display::display(int left, int top, double downsample, DISPLAY_MODE mode)
 {
 	return 0;
+}
+
+void Display::drawRect(float x1, float y1, float x2, float y2, Vector3 colour)
+{
+    float vertices[12];
+    vertices[0] = x1; vertices[1] = y1;
+    vertices[2] = x2; vertices[3] = y1;
+    vertices[4] = x2; vertices[5] = y2;
+
+    vertices[6] = x2; vertices[7] = y2;
+    vertices[8] = x1; vertices[9] = y2;
+    vertices[10] = x1; vertices[11] = y1;
+
+    glBindBuffer(GL_ARRAY_BUFFER, rect_vbo);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float)*12, vertices);
+
+    shaderDrawColour->bind();
+    shaderDrawColour->transmitUniform("colour", colour);
+
+    glDisable(GL_CULL_FACE);
+    glDisable(GL_DEPTH_TEST);
+    glBindVertexArray(rect_vao);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+}
+
+void Display::drawMinimap(float nleft, float ntop, float nwidth, float nheight) // values [0 1] compared to img region
+{
+    // draw img rect
+    float img_left = 0.2, img_top = 0.02;
+    float img_width = 0.6, img_height = 0.1;
+    drawRect(img_left, img_top, img_left + img_width, img_top + img_height, Vector3(0.3, 0.3, 0.3));
+
+    // draw visible area
+    nleft = img_left + nleft*img_width;
+    ntop = img_top + ntop*img_height;
+
+    nwidth = nwidth*img_width;
+    if(nwidth + nleft > img_left + img_width)
+        nwidth = img_left + img_width - nleft;
+    if(nwidth < 0.001)
+        nwidth = 0.001;
+
+    nheight = nheight*img_height;
+    if(nheight + ntop > img_top + img_height)
+        nheight = img_top + img_height - ntop;
+    if(nheight < 0.001)
+        nheight = 0.001;
+
+    drawRect(nleft, ntop, nleft + nwidth, ntop + nheight, Vector3(0.8, 0.8, 0.0));
 }

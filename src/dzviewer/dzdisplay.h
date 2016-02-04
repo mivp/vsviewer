@@ -61,7 +61,7 @@ private:
 	static int sNumLoaderThreads;
 
 public:
-	DZDisplay(int ind, int w, int h);
+	DZDisplay(int ind, int w, int h, int numclients);
 	~DZDisplay();
 	
 	virtual int loadVirtualSlide(Img_t img);

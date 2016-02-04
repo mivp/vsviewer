@@ -64,17 +64,24 @@ struct Img_t{
 
 class Display
 {
+private:
+	// draw rectangle
+	GLuint rect_vao;
+	GLuint rect_vbo;
+
 protected: 
 	int id, index, width, height;
 	int maxlevel;
 	double maxdownsample;
 	
 	uint64_t level0_w, level0_h;
-	
+	uint64_t entire_display_w, entire_display_h;
+
 	bool stereo, leftfirst;
 	Texture *tex1, *tex2;
 	Shader* shaderDisplay;
 	Shader* shaderDisplay3d;
+	Shader* shaderDrawColour;
 	SSQuad* quad;
 	Matrix4 tranMat;
 
@@ -83,14 +90,18 @@ public:
 	uint read_time, render_time;
 
 public:
-	Display(int ind, int w, int h);
+	Display(int ind, int w, int h, int numclients);
 	~Display();
 
 	void getLevel0Size(int64_t &w, int64_t &h) { w = level0_w; h = level0_h; }
 	double getMaxDownsample() { return maxdownsample; }
 
 	int initDisplay();
-	void draw();
+	void drawImage();
+	void drawRect(float x1, float y1, float x2, float y2, Vector3 colour);
+	void drawMinimap(float nleft, float ntop, float nwidth, float nheight);
+	void drawBegin();
+	void drawEnd();
 
 	virtual int loadVirtualSlide(Img_t img);
 	virtual int display(int left=0, int top=0, DISPLAY_MODE mode=MODE_REFRESH);
