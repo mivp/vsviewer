@@ -373,13 +373,13 @@ int DZDisplay::getImageRegion(unsigned char* buffer, int level, Reg_t region_src
 	return 0;
 }
 
-int DZDisplay::display(int left, int top, int mode)
+int DZDisplay::display(int left, int top, int mode, bool minimap)
 {
 	double downsample = 1.0*level0_w / width;
-	return display(left, top, downsample, mode);
+	return display(left, top, downsample, mode, minimap);
 }
 
-int DZDisplay::display(int left, int top, double downsample, int mode)
+int DZDisplay::display(int left, int top, double downsample, int mode, bool minimap)
 {
 	// get best level
 	int64_t img_w, img_h;
@@ -494,7 +494,7 @@ int DZDisplay::display(int left, int top, double downsample, int mode)
 			free(buffer2);
 	}
 
-	if(id == 1) //draw minimap
+	if(id == 1 && minimap) //draw minimap
 	{
 		int nclients = 2;
 		uint64_t entire_display_w = nclients * width;

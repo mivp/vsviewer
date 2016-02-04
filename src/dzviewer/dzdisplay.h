@@ -65,8 +65,8 @@ public:
 	~DZDisplay();
 	
 	virtual int loadVirtualSlide(Img_t img);
-	virtual int display(int left=0, int top=0, int mode=MODE_REFRESH);
-	virtual int display(int left, int top, double downsample, int mode=MODE_REFRESH); //0: refresh only, 1: fast, 2: normal, 3: high quality
+	virtual int display(int left=0, int top=0, int mode=MODE_REFRESH, bool minimap=false);
+	virtual int display(int left, int top, double downsample, int mode=MODE_REFRESH, bool minimap=false); //0: refresh only, 1: fast, 2: normal, 3: high quality
 
 	void setNumThreads(int _thread) {sNumLoaderThreads = _thread;}
 	void clearBuffer();

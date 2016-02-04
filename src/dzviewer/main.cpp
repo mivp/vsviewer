@@ -70,6 +70,8 @@ string str_system = "desktop";
 vector<Img_t> filenames;
 
 bool noomicron = false;
+bool minimap = false;
+
 ServiceManager* sm;
 
 void usage()
@@ -78,6 +80,7 @@ void usage()
 	cout << "Usage: ./vsviewer [-h] [-s system] [-n] [-b buffersize] [-t numthreads] [-i img1] [-l img2l img2r]" << endl;
 	cout << "  -s: system {desktop, cave2}. Default: desktop" << endl;
 	cout << "  -n: dont use Omicron (wand controller)" << endl;
+	cout << "  -m: display minimap" << endl;
 	cout << "  -h: print this help" << endl;
 	cout << "  -b: bufer size. Default = 16" << endl;
 	cout << "  -t: number of reading threads. Default = 2" << endl;
@@ -129,6 +132,11 @@ int initParameters(int argc, char* argv[], int myid)
 		else if (strcmp(argv[i],"-n")==0)
 		{
 			noomicron = true;
+			i++;
+		}
+		else if (strcmp(argv[i],"-m")==0)
+		{
+			minimap = true;
 			i++;
 		}
 		else if (strcmp(argv[i], "-b")==0)
@@ -494,7 +502,7 @@ int main( int argc, char* argv[] ){
 			else if(buff[0] == 'U')
 			{
 				Utils::parseParametersString(buff, mode, l, t, ds);
-				display->display(l, t, ds, mode);
+				display->display(l, t, ds, mode, minimap);
 
 				if(myid == 9)
 					cout << "(9) Read: " << display->read_time << " render: " << display->render_time << endl;
