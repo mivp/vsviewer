@@ -496,10 +496,6 @@ int DZDisplay::display(int left, int top, double downsample, int mode, bool mini
 
 	if(id == 1 && minimap) //draw minimap
 	{
-		int nclients = 2;
-		uint64_t entire_display_w = nclients * width;
-		uint64_t entire_display_h = height;
-
 		Reg_t vis_area;
 		vis_area.left = -left > 0 ? -left : 0;
 		vis_area.top = -top > 0 ? -top : 0;
