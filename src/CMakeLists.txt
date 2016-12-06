@@ -11,6 +11,7 @@ SET( srcs
 		pyramid.cpp 
 		display.cpp
 		pyramid.cpp
+		thread.cpp
 		)
 
 # Build common

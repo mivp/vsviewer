@@ -38,12 +38,32 @@
 
 #include "display.h"
 #include "pyramid.h"
-
-#include <omicron/Thread.h>
+#include "thread.h"
+#include "wqueue.h"
 
 #include <iostream>
 #include <list>
 using namespace std;
+
+class ImageLoaderThread: public Thread {
+
+private:
+	wqueue<JPEG_t*>& m_queue;
+
+public:
+	ImageLoaderThread(wqueue<JPEG_t*>& queue) : m_queue(queue) {}
+
+	void* run() {
+        for (;;) {
+            JPEG_t* jpeg = (JPEG_t*)m_queue.remove();
+            //cout << "  Load image: " << jpeg->path << endl;
+            jpeg->pixels = Utils::loadJPEG(jpeg->path.c_str(), jpeg->width, jpeg->height);
+            jpeg->data_size = jpeg->width*jpeg->height*3;
+            jpeg->ready = true;
+        }
+        return NULL;
+    }
+};
 
 // main class
 class DZDisplay: public Display
@@ -57,18 +77,20 @@ private:
 	string datadir1, datadir2;
 	Pyramid* pyramids[2];
 
-	static list<omicron::Thread*> sImageLoaderThread;
-	static int sNumLoaderThreads;
+	// loader threads
+	wqueue<JPEG_t*>  imageQueue;
+	std::list<ImageLoaderThread*> imageLoaderThreads;
+	int numLoaderThread;
 
 public:
-	DZDisplay(int ind, int w, int h, int numclients);
+	DZDisplay(int ind, int w, int h, int numclients, int t=1);
 	~DZDisplay();
 	
 	virtual int loadVirtualSlide(Img_t img);
 	virtual int display(int left=0, int top=0, int mode=MODE_REFRESH, bool minimap=false);
 	virtual int display(int left, int top, double downsample, int mode=MODE_REFRESH, bool minimap=false); //0: refresh only, 1: fast, 2: normal, 3: high quality
 
-	void setNumThreads(int _thread) {sNumLoaderThreads = _thread;}
+	void setNumThreads(int _thread) {numLoaderThread = _thread;}
 	void clearBuffer();
 	void setBufferSize(int _buffersize) {buffersize = _buffersize;}
 	int getImageRegion(unsigned char* buffer1, int level, Reg_t region_src, int index=0);

@@ -476,9 +476,8 @@ int main( int argc, char* argv[] ){
 	}  
 	else  // clients
 	{  
-		DZDisplay* display = new DZDisplay(myid, cwidth, cheight, numprocs - 1);
+		DZDisplay* display = new DZDisplay(myid, cwidth, cheight, numprocs - 1, numthreads);
 		display->setBufferSize(buffersize);
-		display->setNumThreads(numthreads);
 		display->initDisplay();
 	  	if(display->loadVirtualSlide(filenames[0]) == -1)
 	  		return -1;
