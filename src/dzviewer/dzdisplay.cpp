@@ -49,60 +49,9 @@
 
 using namespace std;
 using namespace tinyxml2;
-using namespace omicron;
-
-//global
-Lock sImageQueueLock;
-bool sShutdownLoaderThread = false;
-int DZDisplay::sNumLoaderThreads = 2;
-list<Thread*> DZDisplay::sImageLoaderThread;
-list<JPEG_t*> sImageQueue;
-
-class ImageLoaderThread: public Thread
-{
-public:
-    ImageLoaderThread()
-    {}
-
-    virtual void threadProc()
-    {
-        cout << "ImageLoaderThread: start" << endl;
-
-        while(!sShutdownLoaderThread)
-        {
-          	if(sImageQueue.size() > 0)
-          	{
-          		sImageQueueLock.lock();
-          		if(sImageQueue.size() > 0)
-                {
-                	JPEG_t* jpeg = sImageQueue.front();
-                    sImageQueue.pop_front();
-                    sImageQueueLock.unlock();
-
-                    //cout << "  Load image: " << jpeg->path << endl;
-                    jpeg->pixels = Utils::loadJPEG(jpeg->path.c_str(), jpeg->width, jpeg->height);
-                    jpeg->data_size = jpeg->width*jpeg->height*3;
-
-                    if(!sShutdownLoaderThread)
-                    {
-                    	jpeg->ready = true;
-                        //cout << "  Image is ready to use!!!" << endl;
-                    }
-                }
-                else
-                {
-                	sImageQueueLock.unlock();
-                }
-
-          	}
-            osleep(1);
-        }
-        cout << "ImageLoaderThread: shutdown" << endl;
-    }
-};
 
 // DZDisplay
-DZDisplay::DZDisplay(int i, int w, int h, int numclients): Display(i, w, h, numclients)
+DZDisplay::DZDisplay(int i, int w, int h, int numclients, int t): Display(i, w, h, numclients)
 {
 	buffersize = 16;
 	level_imgs1.clear();
@@ -111,16 +60,17 @@ DZDisplay::DZDisplay(int i, int w, int h, int numclients): Display(i, w, h, numc
 	pyramids[0] = new Pyramid();
 	pyramids[1] = new Pyramid();
 
-	if(i == 0)
-		sNumLoaderThreads = 1;
 
-	if(sImageLoaderThread.size() == 0)
-    {
-    	for(int i = 0; i < sNumLoaderThreads; i++)
-	    {
-	        Thread* t = new ImageLoaderThread();
-	     	t->start();
-	        sImageLoaderThread.push_back(t);;
+	numLoaderThread = t;
+	if(i == 0)
+		numLoaderThread = 1;
+
+	// reading threads
+	if(imageLoaderThreads.size() == 0) {
+    	for(int i = 0; i < numLoaderThread; i++) {
+    		ImageLoaderThread* t = new ImageLoaderThread(imageQueue);
+    		t->start();
+    		imageLoaderThreads.push_back(t);
 	    }
     }
 }
@@ -135,9 +85,8 @@ DZDisplay::~DZDisplay()
 
 void DZDisplay::clearBuffer()
 {
-	sImageQueueLock.lock();
-	sImageQueue.clear();
-    sImageQueueLock.unlock();
+	while(imageQueue.size())
+		imageQueue.remove();
 
 	for(list<JPEG_t*>::iterator it=level_imgs1.begin(); it != level_imgs1.end(); it++)
     {
@@ -253,18 +202,18 @@ int DZDisplay::getImageRegion(unsigned char* buffer, int level, Reg_t region_src
 	{
 		for(int r = first_t_row; r <= last_t_row; r++)
 		{
-			int ret = pyramids[index]->getValue(level, c, r);
-			if(ret == -1)
-				cout << "Pyramid problem!!! level:" << level << " c: " << c << " r: " << r << endl;
+			//int ret = pyramids[index]->getValue(level, c, r);
+			//if(ret == -1)
+			//	cout << "Pyramid problem!!! level:" << level << " c: " << c << " r: " << r << endl;
 			if(pyramids[index]->getValue(level, c, r) == 0)
 			{
 				JPEG_t* jpeg = new JPEG_t;
 				jpeg->level = level; jpeg->col = c; jpeg->row = r;
 				jpeg->ready = false;
+				jpeg->leftright = index;
 				std::stringstream ss;
 				if(index == 0)
-				{
-					jpeg->leftright = 0;
+				{			
 					ss << datadir1 << level << "/" << c << "_" << r << ".jpeg";
 					jpeg->path = ss.str();
 					level_imgs1.push_back(jpeg);
@@ -272,15 +221,14 @@ int DZDisplay::getImageRegion(unsigned char* buffer, int level, Reg_t region_src
 					{
 						JPEG_t* tmp = level_imgs1.front();
 						free(tmp->pixels);
-						sImageQueueLock.lock();
+						//sImageQueueLock.lock();
 						pyramids[index]->setValue(tmp->level, tmp->col, tmp->row, 0);
-						sImageQueueLock.unlock();
+						//sImageQueueLock.unlock();
 						level_imgs1.pop_front();
 					}
 				}
 				else
 				{
-					jpeg->leftright = 1;
 					ss << datadir2 << level << "/" << c << "_" << r << ".jpeg";
 					jpeg->path = ss.str();
 					level_imgs2.push_back(jpeg);
@@ -288,16 +236,14 @@ int DZDisplay::getImageRegion(unsigned char* buffer, int level, Reg_t region_src
 					{
 						JPEG_t* tmp = level_imgs2.front();
 						free(tmp->pixels);
-						sImageQueueLock.lock();
+						//sImageQueueLock.lock();
 						pyramids[index]->setValue(tmp->level, tmp->col, tmp->row, 0);
-						sImageQueueLock.unlock();
+						//sImageQueueLock.unlock();
 						level_imgs2.pop_front();
 					}
 				}
 				pyramids[index]->setValue(level, c, r, 1);
-				sImageQueueLock.lock();
-				sImageQueue.push_back(jpeg);
-				sImageQueueLock.unlock();
+				imageQueue.add(jpeg);
 			}
 		}
 	}

@@ -10,6 +10,7 @@ SET( srcs
 		tinyxml2.cpp
 		pyramid.cpp 
 		display.cpp
+		thread.cpp
 		)
 
 # Build common
