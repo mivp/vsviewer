@@ -349,13 +349,25 @@ int main( int argc, char* argv[] ){
 		
 			else if ( glfwGetKey(display->window, GLFW_KEY_DOWN ) )
 				Utils::pan(3, pan_amount*h/gcontrol.downsample, gcontrol);
-			
-			else if ( glfwGetKey(display->window, GLFW_KEY_PAGE_UP ) )
+		
+			else if ( glfwGetKeyOnce(display->window, GLFW_KEY_X ) )
 				Utils::zoom(w, h, cwidth, cheight, numprocs, maxdownsample, -zoom_amount, gcontrol);
-			
-			else if ( glfwGetKey(display->window, GLFW_KEY_PAGE_DOWN ) )
-				Utils::zoom(w, h, cwidth, cheight, numprocs, maxdownsample, zoom_amount, gcontrol);
-			
+
+			else if ( glfwGetKeyOnce(display->window, GLFW_KEY_Z ) )
+				Utils::zoom(w, h, cwidth, cheight, numprocs, maxdownsample, zoom_amount, gcontrol);			
+	
+			else if ( glfwGetKeyOnce(display->window, GLFW_KEY_PAGE_UP ) )
+			{
+				loadNextFile(display, file_index, numprocs);
+                                display->display(0, 0, 2);
+			}
+
+			else if ( glfwGetKeyOnce(display->window, GLFW_KEY_PAGE_DOWN ) )
+			{
+				loadNextFile(display, file_index, numprocs, true);
+                                display->display(0, 0, 2);
+			}
+
 			else if ( glfwGetKeyOnce(display->window, GLFW_KEY_N ) ) // next file
 			{
 				loadNextFile(display, file_index, numprocs);
