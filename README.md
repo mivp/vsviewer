@@ -18,16 +18,19 @@ make
 ## How to run dzviewer
 
 ```
-GO_DESKTOP_DZ [-b buffersize] [-t numthreads] [-i dzi_file] [-l dzi_file_l dzi_file_r]
-GO_CAVE2_DZ [-b buffersize] [-t numthreads] [-i dzi_file] [-l dzi_file_l dzi_file_r]
+GO_DESKTOP_DZ [-n] [-m] [-a seconds] [-b buffersize] [-t numthreads] [-i dzi_file] [-l dzi_file_l dzi_file_r]
+GO_CAVE2_DZ [-n] [-m] [-a seconds] [-b buffersize] [-t numthreads] [-i dzi_file] [-l dzi_file_l dzi_file_r]
 ```
+* -n: use Omicron (wand)
+* -m: display minimap at the top-left corner
+* -a seconds: go to next slides in every (a) seconds. To toggle slideview mode, press A key on keyboard or X button on controller.
 * default values: buffersize = 16, numthreads = 2
 * check GO_DESKTOP_DZ_DEMO and GO_CAVE2_DZ_DEMO for examples
 
 ## Usage
 
 - keyboard: use LEFT, RIGHT, UP, DOWN to pan; PAGE_UP/PAGE_DOWN to zoom; 'n'/'b' to go to next/previous image
-- PS3 move controller: use LEFT, RIGHT, UP, DOWN button to pan; X/O buttons to zoom; L1 button to go to next image
+- PS3 move controller: use LEFT, RIGHT, UP, DOWN button to pan; A/B buttons to zoom; L1 button to go to next image; X to toggle slideview mode
 
 ## Note: Convert to PyramidalTIFF with ImageMagick
 

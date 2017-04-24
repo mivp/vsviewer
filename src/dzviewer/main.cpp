@@ -72,18 +72,24 @@ vector<Img_t> filenames;
 bool noomicron = false;
 bool minimap = false;
 
+// slide view: auto go to next slide in every slidetime seconds
+bool slideview = false;
+float slidetime = 10;
+uint slidetime_last = 0;
+
 ServiceManager* sm;
 
 void usage()
 {
 	cout << endl;
-	cout << "Usage: ./vsviewer [-h] [-s system] [-n] [-b buffersize] [-t numthreads] [-i img1] [-l img2l img2r]" << endl;
+	cout << "Usage: ./vsviewer [-h] [-s system] [-n] [-b buffersize] [-t numthreads] [-a seconds] [-i img1] [-l img2l img2r]" << endl;
 	cout << "  -s: system {desktop, cave2}. Default: desktop" << endl;
 	cout << "  -n: dont use Omicron (wand controller)" << endl;
 	cout << "  -m: display minimap" << endl;
 	cout << "  -h: print this help" << endl;
 	cout << "  -b: bufer size. Default = 16" << endl;
 	cout << "  -t: number of reading threads. Default = 2" << endl;
+	cout << "  -a: go to next slide automatically after (a) seconds. Default = 10 seconds" << endl;
 	cout << "  -i: single file" << endl;
 	cout << "  -l: stereo, left first" << endl;
 	cout << "  -r: stereo, right first" << endl;
@@ -144,9 +150,13 @@ int initParameters(int argc, char* argv[], int myid)
 			buffersize = atoi(argv[++i]);
 			i++;
 		}
-		else if(strcmp(argv[i], "-t") ==0)
+		else if (strcmp(argv[i], "-t")==0)
 		{
 			numthreads = atoi(argv[++i]);
+			i++;
+		}
+		else if (strcmp(argv[i], "-a")==0) {
+			slidetime = atof(argv[++i]);
 			i++;
 		}
 		else if (strcmp(argv[i],"-i")==0)
@@ -250,6 +260,10 @@ int loadNextFile(DZDisplay* display, int& file_index, int numprocs, bool backwar
 			MPI_Send((char*)ss.str().c_str(), 256, MPI_CHAR, i, 0, MPI_COMM_WORLD);
 		for(int i=1;i<numprocs;i++)  
 			MPI_Recv(buff_r, 256, MPI_CHAR, i, 0, MPI_COMM_WORLD, &stat);
+
+		if(slideview) {
+			slidetime_last = Utils::getTime();
+		}
 	}
 	return 0;
 }
@@ -359,13 +373,13 @@ int main( int argc, char* argv[] ){
 			else if ( glfwGetKeyOnce(display->window, GLFW_KEY_PAGE_UP ) )
 			{
 				loadNextFile(display, file_index, numprocs);
-                                display->display(0, 0, 2);
+                display->display(0, 0, 2);
 			}
 
 			else if ( glfwGetKeyOnce(display->window, GLFW_KEY_PAGE_DOWN ) )
 			{
 				loadNextFile(display, file_index, numprocs, true);
-                                display->display(0, 0, 2);
+                display->display(0, 0, 2);
 			}
 
 			else if ( glfwGetKeyOnce(display->window, GLFW_KEY_N ) ) // next file
@@ -379,6 +393,12 @@ int main( int argc, char* argv[] ){
 				loadNextFile(display, file_index, numprocs, true);
 				display->display(0, 0, 2);
 			}
+
+			else if ( glfwGetKeyOnce(display->window, GLFW_KEY_A ) ) // slide view mode
+			{
+				slideview = !slideview;
+				slidetime_last = Utils::getTime();
+			}	
 			
 			else if ( glfwGetKeyOnce(display->window, GLFW_KEY_G ) )
 				mode = MODE_HIGH; // high quality
@@ -433,11 +453,15 @@ int main( int argc, char* argv[] ){
 									display->display(0, 0, 2);
 								}
 								break;
-							case Event::Button3: // X
+							case Event::Button3: // B
 								Utils::zoom(w, h, cwidth, cheight, numprocs, maxdownsample, zoom_amount, gcontrol);
 								break;
-							case Event::Button2: // O
+							case Event::Button2: // A
 								Utils::zoom(w, h, cwidth, cheight, numprocs, maxdownsample, -zoom_amount, gcontrol);
+								break;
+							case Event::Button4: // X
+								slideview = !slideview;
+								slidetime_last = Utils::getTime();
 								break;					
 							case Event::ButtonLeft:
 								Utils::pan(0, pan_amount*w/gcontrol.downsample, gcontrol);
@@ -469,7 +493,18 @@ int main( int argc, char* argv[] ){
 	            		}
 					}
 				}
-			}		
+			}	
+
+			if(slideview) {
+        		if(Utils::getTime() - slidetime_last > slidetime * 1000.0) {
+        			loadNextFile(display, file_index, numprocs);
+                	display->display(0, 0, 2);
+
+                	t_start = Utils::getTime();
+                	need_full_update = true;
+        		}
+        	}
+
 			if(need_full_update)
         	{
         		uint timediff = Utils::getTime() - t_start;
@@ -484,6 +519,7 @@ int main( int argc, char* argv[] ){
     				need_full_update = false;
         		}
         	}
+        	
     	}
 	}  
 	else  // clients
