@@ -398,6 +398,10 @@ int main( int argc, char* argv[] ){
 			{
 				slideview = !slideview;
 				slidetime_last = Utils::getTime();
+				if(slideview)
+					cout << endl << "Slideview: ON" << endl << endl;
+				else
+					cout << endl << "Slideview: OFF" << endl << endl;
 			}	
 			
 			else if ( glfwGetKeyOnce(display->window, GLFW_KEY_G ) )
@@ -460,8 +464,15 @@ int main( int argc, char* argv[] ){
 								Utils::zoom(w, h, cwidth, cheight, numprocs, maxdownsample, -zoom_amount, gcontrol);
 								break;
 							case Event::Button4: // X
-								slideview = !slideview;
-								slidetime_last = Utils::getTime();
+								if(evts[evtNum].getType() == Event::Down)
+								{
+									slideview = !slideview;
+									slidetime_last = Utils::getTime();
+									if(slideview)
+										cout << endl << "Slideview: ON" << endl << endl;
+									else
+										cout << endl << "Slideview: OFF" << endl << endl;
+								}
 								break;					
 							case Event::ButtonLeft:
 								Utils::pan(0, pan_amount*w/gcontrol.downsample, gcontrol);

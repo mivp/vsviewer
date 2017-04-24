@@ -1,4 +1,4 @@
-#include "Thread.h"
+#include "thread.h"
 #include <iostream>
 
 Thread::Thread() : m_tid(0), m_running(0), m_detached(0) {
