@@ -394,7 +394,7 @@ int main( int argc, char* argv[] ){
 				display->display(0, 0, 2);
 			}
 
-			else if ( glfwGetKeyOnce(display->window, GLFW_KEY_A ) ) // slide view mode
+			else if ( glfwGetKeyOnce(display->window, GLFW_KEY_PERIOD ) ) // slide view mode
 			{
 				slideview = !slideview;
 				slidetime_last = Utils::getTime();
