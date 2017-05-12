@@ -1,6 +1,6 @@
 # Virtual slide viewer for CAVE2
 
-## Requisition
+## Prerequisite
 
 * [openmpi](http://www.open-mpi.org/)
 
