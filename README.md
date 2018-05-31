@@ -1,6 +1,12 @@
 # Virtual slide viewer for CAVE2
 
-## Requisition
+Display high resolution DeepZoom images on CAVE2
+
+[Screenshots](http://www.toaninfo.com/work/2015-vsviewer.html)
+
+**Contact**: Toan Nguyen ([http://monash.edu/mivp](http://monash.edu/mivp))
+
+## Prerequisite
 
 * [openmpi](http://www.open-mpi.org/)
 
