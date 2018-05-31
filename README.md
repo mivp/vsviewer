@@ -18,10 +18,11 @@ make
 ## How to run dzviewer
 
 ```
-GO_DESKTOP_DZ [-n] [-m] [-a seconds] [-b buffersize] [-t numthreads] [-i dzi_file] [-l dzi_file_l dzi_file_r]
-GO_CAVE2_DZ [-n] [-m] [-a seconds] [-b buffersize] [-t numthreads] [-i dzi_file] [-l dzi_file_l dzi_file_r]
+GO_DESKTOP_DZ [-n] [-p] [-m] [-a seconds] [-b buffersize] [-t numthreads] [-i dzi_file] [-l dzi_file_l dzi_file_r]
+GO_CAVE2_DZ [-n] [-p] [-m] [-a seconds] [-b buffersize] [-t numthreads] [-i dzi_file] [-l dzi_file_l dzi_file_r]
 ```
 * -n: use Omicron (wand)
+* -p: if the image is shrunk until it fits within a single pixel (default vips depth option)
 * -m: display minimap at the top-left corner
 * -a seconds: go to next slides in every (a) seconds. To toggle slideview mode, press '.' (PERIOD) key on keyboard or X button on controller.
 * default values: buffersize = 16, numthreads = 2
@@ -39,8 +40,10 @@ GO_CAVE2_DZ [-n] [-m] [-a seconds] [-b buffersize] [-t numthreads] [-i dzi_file]
 ## Note: Convert to virtual slide to DeepZoom with Vips
 
 - vips dzsave 3755.svs 3755 --tile-size 1024 --depth onetile
+- vips dzsave 3755.svs 3755 (in this case, we need to turn on -p option because the image is shrunk until it fits within a single pixel
 
 ## Log
 
+* v1.1.1: add onepixel pyramid support
 * v1.1.0: async image reading
 * v1.0.0: DeepZoom input

@@ -28,7 +28,7 @@ private:
 public:
 	Pyramid();
 	~Pyramid();
-	int build(int64_t width, int64_t height, int tilesize);
+	int build(int64_t width, int64_t height, int tilesize, bool onepixel=false);
 	int setValue(int level, int col, int row, int value);
 	int getValue(int level, int col, int row);
 	int print();

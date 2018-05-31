@@ -71,6 +71,7 @@ vector<Img_t> filenames;
 
 bool noomicron = false;
 bool minimap = false;
+bool onepixel = false; // the image is shrunk until it fits within a single pixel
 
 // slide view: auto go to next slide in every slidetime seconds
 bool slideview = false;
@@ -82,9 +83,10 @@ ServiceManager* sm;
 void usage()
 {
 	cout << endl;
-	cout << "Usage: ./vsviewer [-h] [-s system] [-n] [-b buffersize] [-t numthreads] [-a seconds] [-i img1] [-l img2l img2r]" << endl;
+	cout << "Usage: ./vsviewer [-h] [-s system] [-n] [-p] [-m] [-b buffersize] [-t numthreads] [-a seconds] [-i img1] [-l img2l img2r]" << endl;
 	cout << "  -s: system {desktop, cave2}. Default: desktop" << endl;
 	cout << "  -n: dont use Omicron (wand controller)" << endl;
+	cout << "  -p: the image is shrunk until it fits within a single pixel (vips default depth)" << endl;
 	cout << "  -m: display minimap" << endl;
 	cout << "  -h: print this help" << endl;
 	cout << "  -b: bufer size. Default = 16" << endl;
@@ -138,6 +140,11 @@ int initParameters(int argc, char* argv[], int myid)
 		else if (strcmp(argv[i],"-n")==0)
 		{
 			noomicron = true;
+			i++;
+		}
+		else if (strcmp(argv[i],"-p")==0)
+		{
+			onepixel = true;
 			i++;
 		}
 		else if (strcmp(argv[i],"-m")==0)
@@ -293,7 +300,7 @@ int main( int argc, char* argv[] ){
 	{
 		int file_index = 0;
 
-		DZDisplay* display = new DZDisplay(0, 800, 600, numprocs - 1);
+		DZDisplay* display = new DZDisplay(0, 800, 600, numprocs - 1, numthreads, onepixel);
 		display->initDisplay();
 	  	if(display->loadVirtualSlide(filenames[0]) != 0)
 	  		return -1;
@@ -370,13 +377,13 @@ int main( int argc, char* argv[] ){
 			else if ( glfwGetKeyOnce(display->window, GLFW_KEY_Z ) )
 				Utils::zoom(w, h, cwidth, cheight, numprocs, maxdownsample, zoom_amount, gcontrol);			
 	
-			else if ( glfwGetKeyOnce(display->window, GLFW_KEY_PAGE_UP ) )
+			else if ( glfwGetKeyOnce(display->window, GLFW_KEY_PAGE_DOWN ) )
 			{
 				loadNextFile(display, file_index, numprocs);
                 display->display(0, 0, 2);
 			}
 
-			else if ( glfwGetKeyOnce(display->window, GLFW_KEY_PAGE_DOWN ) )
+			else if ( glfwGetKeyOnce(display->window, GLFW_KEY_PAGE_UP ) )
 			{
 				loadNextFile(display, file_index, numprocs, true);
                 display->display(0, 0, 2);
@@ -535,7 +542,7 @@ int main( int argc, char* argv[] ){
 	}  
 	else  // clients
 	{  
-		DZDisplay* display = new DZDisplay(myid, cwidth, cheight, numprocs - 1, numthreads);
+		DZDisplay* display = new DZDisplay(myid, cwidth, cheight, numprocs - 1, numthreads, onepixel);
 		display->setBufferSize(buffersize);
 		display->initDisplay();
 	  	if(display->loadVirtualSlide(filenames[0]) == -1)

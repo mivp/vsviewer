@@ -51,15 +51,16 @@ using namespace std;
 using namespace tinyxml2;
 
 // DZDisplay
-DZDisplay::DZDisplay(int i, int w, int h, int numclients, int t): Display(i, w, h, numclients)
+DZDisplay::DZDisplay(int i, int w, int h, int numclients, int t, bool op): Display(i, w, h, numclients)
 {
+	cout << "Init " << i << " " << op << endl;
+	onepixel = op;
 	buffersize = 16;
 	level_imgs1.clear();
 	level_imgs2.clear();
 
 	pyramids[0] = new Pyramid();
 	pyramids[1] = new Pyramid();
-
 
 	numLoaderThread = t;
 	if(i == 0)
@@ -156,9 +157,10 @@ int DZDisplay::loadVirtualSlide(Img_t img)
 		cout << "Invalid type" << endl;
 		return -1;
 	}
-	cout << "datadir1: " << datadir1 << " datadir2: " << datadir2 << endl;
+	cout << "datadir1: " << datadir1 << endl << "datadir2: " << datadir2 << endl;
 	
-	maxdownsample = 2.0 * level0_w / 1024;
+	maxdownsample = 2.0 * level0_w / tilesize;//1024;
+	cout << "max downsample: " << maxdownsample << endl;
 
 	// texture
 	if(tex1 == NULL)
@@ -174,11 +176,11 @@ int DZDisplay::loadVirtualSlide(Img_t img)
 	}
 
 	// indexing
-	pyramids[0]->build(level0_w, level0_h, tilesize);
+	pyramids[0]->build(level0_w, level0_h, tilesize, onepixel);
 	if(id == 18)
 		pyramids[0]->print();
 	if(stereo)
-		pyramids[1]->build(level0_w, level0_h, tilesize);
+		pyramids[1]->build(level0_w, level0_h, tilesize, onepixel);
 
 	cout << "(" << id << ") loadVirtualSlide completed!" << endl;
 	
@@ -362,13 +364,14 @@ int DZDisplay::display(int left, int top, double downsample, int mode, bool mini
 
 		//
 		maxlevel = 0;
-		while(pow(2,maxlevel)*tilesize <= level0_w)
+		int size = onepixel ? 1 : tilesize;
+		while(pow(2,maxlevel)*size <= level0_w)
 			maxlevel++;
+		
 		//cout << "maxlevel: " << maxlevel << endl;
-
 		int level;
 		for(level=0; level < maxlevel; level++)
-			if(pow(2,level)*tilesize > img_w)
+			if(pow(2,level)*size > img_w)
 				break;
 
 		double ratio = 1.0*level0_w / pow(2, (maxlevel-level)) / img_w;

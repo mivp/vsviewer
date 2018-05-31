@@ -71,6 +71,7 @@ class DZDisplay: public Display
 private: 
 	int tilesize;
 	int buffersize;
+	bool onepixel;
 
 	list<JPEG_t*> level_imgs1;
 	list<JPEG_t*> level_imgs2;
@@ -83,7 +84,7 @@ private:
 	int numLoaderThread;
 
 public:
-	DZDisplay(int ind, int w, int h, int numclients, int t=1);
+	DZDisplay(int ind, int w, int h, int numclients, int t=1, bool onepixel = false);
 	~DZDisplay();
 	
 	virtual int loadVirtualSlide(Img_t img);

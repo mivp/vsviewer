@@ -52,12 +52,13 @@ Pyramid::~Pyramid()
 	levels.clear();
 }
 
-int Pyramid::build(int64_t width, int64_t height, int tilesize)
+int Pyramid::build(int64_t width, int64_t height, int tilesize, bool onepixel)
 {
 	levels.clear();
 
 	maxlevel = 0;
-	while(pow(2,maxlevel)*tilesize <= width)
+	int size = onepixel ? 1 : tilesize;
+	while(pow(2,maxlevel)*size <= width)
 		maxlevel++;
 	
 	int64_t w, h;
