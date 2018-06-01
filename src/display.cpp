@@ -103,6 +103,7 @@ int Display::initDisplay()
 
     // print GL info
     //GLUtils::dumpGLInfo(true);
+    string shaderDir = SHADER_DIR;
 
 	// shaders
 	list<string> attributes, uniforms;
@@ -111,7 +112,8 @@ int Display::initDisplay()
     attributes.push_back("texcoor");
     uniforms.push_back("tranMat");
     uniforms.push_back("texScene");
-    ShaderLibrary::addShader("ss_display", "shaders/ss_display", attributes, uniforms);
+    string shaderloc = shaderDir; shaderloc.append("ss_display");
+    ShaderLibrary::addShader("ss_display", shaderloc, attributes, uniforms);
     shaderDisplay = ShaderLibrary::getShader("ss_display");
 
     attributes.clear(); uniforms.clear();
@@ -121,13 +123,15 @@ int Display::initDisplay()
     uniforms.push_back("leftFirst");
     uniforms.push_back("texScene1");
     uniforms.push_back("texScene2");
-    ShaderLibrary::addShader("ss_display3d", "shaders/ss_display3d", attributes, uniforms);
+    shaderloc = shaderDir; shaderloc.append("ss_display3d");
+    ShaderLibrary::addShader("ss_display3d", shaderloc, attributes, uniforms);
     shaderDisplay3d = ShaderLibrary::getShader("ss_display3d");
 
     attributes.clear(); uniforms.clear();
     attributes.push_back("position");
     uniforms.push_back("colour");
-    ShaderLibrary::addShader("ss_draw_colour", "shaders/ss_draw_colour", attributes, uniforms);
+    shaderloc = shaderDir; shaderloc.append("ss_draw_colour");
+    ShaderLibrary::addShader("ss_draw_colour", shaderloc, attributes, uniforms);
     shaderDrawColour = ShaderLibrary::getShader("ss_draw_colour");
 
     // quad

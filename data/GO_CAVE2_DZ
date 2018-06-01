@@ -10,4 +10,4 @@ do
 done
 
 echo $args
-mpirun -np 21 --default-hostfile machines-monash dzviewer -s cave2 ${args}
+mpirun -np 21 --default-hostfile machines-monash rundzviewer.sh ${args}

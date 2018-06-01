@@ -28,9 +28,11 @@ find_package(MPI REQUIRED)
 include_directories(${MPI_INCLUDE_PATH})
 
 # Omicron
-include(ExternalProject)
-include(${CMAKE_SOURCE_DIR}/external/UseOmicron.cmake)
-include_directories(${OMICRON_INCLUDE_DIRS})
+#include(ExternalProject)
+#include(${CMAKE_SOURCE_DIR}/external/UseOmicron.cmake)
+#include_directories(${OMICRON_INCLUDE_DIRS})
+include_directories(/cave/omegalib/omegalib13.1-cxx11/src/omicron/include /cave/omegalib/omegalib13.1-cxx11/build/src/omicron/omicron/include)
+link_directories(/cave/omegalib/omegalib13.1-cxx11/build/bin) 
 
 # libjpeg
 find_package(JPEG REQUIRED)
@@ -38,6 +40,9 @@ include_directories(${JPEG_INCLUDE_DIR})
 
 # Set output paths
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
+# Set shader path
+add_definitions(-DSHADER_DIR=\"${CMAKE_SOURCE_DIR}/data/shaders/\")
 
 file (COPY ${CMAKE_SOURCE_DIR}/data/ DESTINATION ${CMAKE_BINARY_DIR}/bin )
 
@@ -53,7 +58,8 @@ set(ALL_LIBS
 	GLFW_303
 	GLEW_190
 	${MPI_LIBRARIES}
-	${OMICRON_LIB}
+	#${OMICRON_LIB}
+	-lomicron
 	${JPEG_LIBRARIES}
 )
 
